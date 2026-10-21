@@ -1,0 +1,74 @@
+// Dữ liệu mẫu cho BrewLite. Chạy: npx prisma db seed
+import 'dotenv/config';
+import { PrismaPg } from '@prisma/adapter-pg';
+import * as bcrypt from 'bcryptjs';
+import { PrismaClient } from '../src/generated/prisma/client';
+
+const prisma = new PrismaClient({
+  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
+});
+
+const products = [
+  { name: 'Cà phê sữa đá', category: 'Cà phê', price: 29000, slug: 'ca-phe-sua-da', description: 'Cà phê phin đậm đà pha cùng sữa đặc, uống kèm đá.' },
+  { name: 'Cà phê đen đá', category: 'Cà phê', price: 25000, slug: 'ca-phe-den-da', description: 'Cà phê phin nguyên chất, vị đắng đậm.' },
+  { name: 'Bạc xỉu', category: 'Cà phê', price: 32000, slug: 'bac-xiu', description: 'Nhiều sữa, ít cà phê, ngọt dịu.' },
+  { name: 'Cappuccino', category: 'Cà phê', price: 45000, slug: 'cappuccino', description: 'Espresso với lớp bọt sữa mịn.' },
+  { name: 'Latte', category: 'Cà phê', price: 45000, slug: 'latte', description: 'Espresso pha nhiều sữa tươi nóng.' },
+  { name: 'Trà đào cam sả', category: 'Trà', price: 39000, slug: 'tra-dao-cam-sa', description: 'Trà đen, đào miếng, cam và sả thơm mát.' },
+  { name: 'Trà sữa trân châu', category: 'Trà', price: 35000, slug: 'tra-sua-tran-chau', description: 'Trà sữa đậm vị kèm trân châu đường đen.' },
+  { name: 'Matcha latte', category: 'Trà', price: 49000, slug: 'matcha-latte', description: 'Bột matcha Nhật pha sữa tươi.' },
+  { name: 'Sinh tố bơ', category: 'Đá xay', price: 45000, slug: 'sinh-to-bo', description: 'Bơ sáp xay cùng sữa đặc.' },
+  { name: 'Chocolate đá xay', category: 'Đá xay', price: 49000, slug: 'chocolate-da-xay', description: 'Chocolate xay đá, phủ kem tươi.' },
+];
+
+const toppings = [
+  { name: 'Trân châu đen', price: 8000 },
+  { name: 'Thạch cà phê', price: 8000 },
+  { name: 'Kem cheese', price: 12000 },
+  { name: 'Thêm 1 shot espresso', price: 10000 },
+];
+
+async function main() {
+  // Xoá dữ liệu cũ theo thứ tự (bảng con trước, bảng cha sau)
+  await prisma.loyaltyTransaction.deleteMany();
+  await prisma.payment.deleteMany();
+  await prisma.orderItem.deleteMany();
+  await prisma.order.deleteMany();
+  await prisma.product.deleteMany();
+  await prisma.topping.deleteMany();
+  await prisma.promotion.deleteMany();
+  await prisma.user.deleteMany();
+
+  await prisma.product.createMany({
+    data: products.map(({ slug, ...p }) => ({
+      ...p,
+      imageUrl: `/images/drinks/${slug}.svg`,
+      stock: 50,
+    })),
+  });
+  await prisma.topping.createMany({ data: toppings });
+
+  await prisma.promotion.createMany({
+    data: [
+      { code: 'GIAM10', type: 'PERCENT', value: 10, minOrder: 50000 },
+      { code: 'BREW20K', type: 'FIXED', value: 20000, minOrder: 100000 },
+    ],
+  });
+
+  const password = await bcrypt.hash('123456', 10);
+  await prisma.user.createMany({
+    data: [
+      { email: 'khach@brewlite.vn', name: 'Khách Demo', password },
+      { email: 'staff@brewlite.vn', name: 'Nhân viên', password, role: 'STAFF' },
+    ],
+  });
+
+  console.log('Seed xong: 10 đồ uống, 4 topping, 2 mã giảm giá, 2 tài khoản');
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(() => prisma.$disconnect());
