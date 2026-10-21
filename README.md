@@ -11,8 +11,8 @@
 ## Cấu trúc thư mục
 | Thư mục | Nội dung |
 |---|---|
-| `frontend` | Giao diện Next.js |
-| `backend` | API NestJS |
+| `frontend` | Giao diện Next.js (ảnh đồ uống: `public/images/drinks`) |
+| `backend` | API NestJS (database: `prisma/schema.prisma`, dữ liệu mẫu: `prisma/seed.ts`) |
 | `docs/progress` | Bảng phân công và tiến độ |
 | `docs/user-stories` | User Story theo từng Sprint |
 
@@ -21,10 +21,47 @@
 - Docker Desktop
 
 ## Chạy local
-1. Sao chép file môi trường: `copy .env.example .env` (Git Bash/macOS: `cp .env.example .env`)
-2. Bật database: `docker compose up -d`
-3. Backend: `cd backend` → `npm install` → `npm run start:dev` (http://localhost:4000)
-4. Frontend: `cd frontend` → `npm install` → `npm run dev` (http://localhost:3000)
+
+### 1. Chuẩn bị
+```
+copy .env.example .env
+docker compose up -d
+```
+(Git Bash/macOS dùng `cp` thay cho `copy`. Mở Docker Desktop trước khi chạy.)
+
+### 2. Backend – http://localhost:4000
+```
+cd backend
+copy ..\.env .env
+npm install
+npx prisma migrate dev
+npx prisma db seed
+npm run start:dev
+```
+- `npx prisma migrate dev`: tạo các bảng trong database
+- `npx prisma db seed`: thêm dữ liệu mẫu (10 đồ uống, 4 topping, 2 mã giảm giá, 2 tài khoản test)
+- Kiểm tra kết nối database: http://localhost:4000/health → `{"status":"ok","database":"up"}`
+- Xem dữ liệu trực quan: `npx prisma studio`
+
+### 3. Frontend – http://localhost:3000
+```
+cd frontend
+npm install
+npm run dev
+```
+
+### Tài khoản test
+| Email | Mật khẩu | Vai trò |
+|---|---|---|
+| `khach@brewlite.vn` | `123456` | Khách hàng |
+| `staff@brewlite.vn` | `123456` | Nhân viên |
+
+Mã giảm giá mẫu: `GIAM10` (giảm 10%, đơn từ 50.000đ), `BREW20K` (giảm 20.000đ, đơn từ 100.000đ).
+
+### Lỗi thường gặp
+- `Can't reach database server`: chưa mở Docker Desktop hoặc chưa chạy `docker compose up -d`.
+- `Cannot find module '.../generated/prisma'`: chạy `npx prisma generate` trong thư mục `backend`.
+- Muốn làm mới dữ liệu mẫu: chạy lại `npx prisma db seed`.
 
 ## Thành viên và phân công
 | Thành viên | Vai trò | Task đảm nhận |
