@@ -19,6 +19,11 @@ const products = [
   { name: 'Matcha latte', category: 'Trà', price: 49000, slug: 'matcha-latte', description: 'Bột matcha Nhật pha sữa tươi.' },
   { name: 'Sinh tố bơ', category: 'Đá xay', price: 45000, slug: 'sinh-to-bo', description: 'Bơ sáp xay cùng sữa đặc.' },
   { name: 'Chocolate đá xay', category: 'Đá xay', price: 49000, slug: 'chocolate-da-xay', description: 'Chocolate xay đá, phủ kem tươi.' },
+  // Món bổ sung (Búp)
+  { name: 'Trà dâu', category: 'Trà', price: 39000, slug: 'tra-dau', description: 'Trà đen, mứt dâu tươi mát, kèm dâu tươi.' },
+  { name: 'Trà nho', category: 'Trà', price: 39000, slug: 'tra-nho', description: 'Trà đen, mứt nho tươi mát, kèm nho tươi.' },
+  { name: 'Trà xoài', category: 'Trà', price: 39000, slug: 'tra-xoai', description: 'Trà đen, mứt xoài tươi mát, kèm xoài tươi miếng.' },
+  { name: 'Cookie đá xay', category: 'Đá xay', price: 55000, slug: 'cookie-da-xay', description: 'Đá xay béo ngậy với bánh cookie, phủ kem tươi.' },
 ];
 
 const toppings = [
@@ -26,18 +31,20 @@ const toppings = [
   { name: 'Thạch cà phê', price: 8000 },
   { name: 'Kem cheese', price: 12000 },
   { name: 'Thêm 1 shot espresso', price: 10000 },
+  // Topping bổ sung (Búp)
+  { name: 'Trân châu trắng', price: 5000 },
+  { name: 'Pudding', price: 10000 },
+  { name: 'Thạch trái cây', price: 8000 },
+  { name: 'Bánh flan', price: 12000 },
+  { name: 'Thạch phô mai', price: 12000 },
 ];
 
 async function main() {
-  // Xoá dữ liệu cũ theo thứ tự (bảng con trước, bảng cha sau)
-  await prisma.loyaltyTransaction.deleteMany();
-  await prisma.payment.deleteMany();
-  await prisma.orderItem.deleteMany();
-  await prisma.order.deleteMany();
-  await prisma.product.deleteMany();
-  await prisma.topping.deleteMany();
-  await prisma.promotion.deleteMany();
-  await prisma.user.deleteMany();
+  // Xoá dữ liệu cũ và ĐẶT LẠI id về 1, để chạy seed bao nhiêu lần
+  // thì Cà phê sữa đá vẫn là id 1, Latte vẫn là id 5...
+  await prisma.$executeRawUnsafe(
+    'TRUNCATE "LoyaltyTransaction", "Payment", "OrderItem", "Order", "Product", "Topping", "Promotion", "User" RESTART IDENTITY CASCADE',
+  );
 
   await prisma.product.createMany({
     data: products.map(({ slug, ...p }) => ({
@@ -63,7 +70,7 @@ async function main() {
     ],
   });
 
-  console.log('Seed xong: 10 đồ uống, 4 topping, 2 mã giảm giá, 2 tài khoản');
+  console.log(`Seed xong: ${products.length} đồ uống, ${toppings.length} topping, 2 mã giảm giá, 2 tài khoản`);
 }
 
 main()
