@@ -29,6 +29,18 @@ function formatVnd(amount: number) {
   return amount.toLocaleString('vi-VN') + 'đ';
 }
 
+function getIcon(p: Product) {
+  const name = p.name.toLowerCase();
+  if (name.includes('đào')) return '🍑';
+  if (name.includes('dâu')) return '🍓';
+  if (name.includes('cookie')) return '🍪';
+  if (name.includes('latte')) return '🥛';
+  if (p.category === 'Cà phê') return '☕';
+  if (p.category === 'Trà') return '🍹';
+  if (p.category === 'Đá xay') return '🥤';
+  return '🧋';
+}
+
 async function fetchProducts(): Promise<Product[]> {
   if (USE_MOCK) {
     await new Promise((resolve) => setTimeout(resolve, 500));
@@ -46,6 +58,7 @@ export default function MenuPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [category, setCategory] = useState('Tất cả');
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
@@ -71,6 +84,9 @@ export default function MenuPage() {
     setReloadKey((k) => k + 1);
   };
 
+  const categories = ['Tất cả', ...Array.from(new Set(products.map((p) => p.category)))];
+  const shown = category === 'Tất cả' ? products : products.filter((p) => p.category === category);
+
   return (
     <main className="mx-auto max-w-6xl p-4">
       <h1 className="mb-4 text-2xl font-bold">Thực đơn</h1>
@@ -91,28 +107,44 @@ export default function MenuPage() {
       )}
 
       {!loading && !error && products.length > 0 && (
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
-          {products.map((p) => (
-            <Link
-              key={p.id}
-              href={`/products/${p.id}`}
-              className="overflow-hidden rounded-lg border bg-white shadow-sm hover:shadow-md"
-            >
-              {p.imageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={p.imageUrl} alt={p.name} className="aspect-square w-full object-cover" />
-              ) : (
-                <div className="flex aspect-square w-full items-center justify-center bg-amber-50 text-4xl">
-                  ☕
+        <>
+          <div className="mb-4 flex flex-wrap gap-2">
+            {categories.map((c) => (
+              <button
+                key={c}
+                onClick={() => setCategory(c)}
+                className={`rounded-full border px-3 py-1 text-sm ${
+                  category === c ? 'bg-amber-700 text-white' : 'bg-white text-gray-700'
+                }`}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+            {shown.map((p) => (
+              <Link
+                key={p.id}
+                href={`/products/${p.id}`}
+                className="overflow-hidden rounded-lg border bg-white shadow-sm hover:shadow-md"
+              >
+                {p.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={p.imageUrl} alt={p.name} className="aspect-square w-full object-cover" />
+                ) : (
+                  <div className="flex aspect-square w-full items-center justify-center bg-amber-50 text-4xl">
+                    {getIcon(p)}
+                  </div>
+                )}
+                <div className="p-3">
+                  <h2 className="font-semibold">{p.name}</h2>
+                  <p className="text-amber-700">{formatVnd(p.price)}</p>
                 </div>
-              )}
-              <div className="p-3">
-                <h2 className="font-semibold">{p.name}</h2>
-                <p className="text-amber-700">{formatVnd(p.price)}</p>
-              </div>
-            </Link>
-          ))}
-        </div>
+              </Link>
+            ))}
+          </div>
+        </>
       )}
     </main>
   );
