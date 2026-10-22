@@ -18,11 +18,21 @@ const USE_MOCK = true;
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 const MOCK_PRODUCTS: Product[] = [
-  { id: 1, name: 'Latte', description: '', category: 'Cà phê', price: 49000, imageUrl: '', stock: 50 },
-  { id: 2, name: 'Cà phê sữa', description: '', category: 'Cà phê', price: 29000, imageUrl: '', stock: 50 },
-  { id: 3, name: 'Trà đào', description: '', category: 'Trà', price: 39000, imageUrl: '', stock: 50 },
-  { id: 4, name: 'Trà dâu', description: '', category: 'Trà', price: 39000, imageUrl: '', stock: 50 },
-  { id: 5, name: 'Cookie đá xay', description: '', category: 'Đá xay', price: 55000, imageUrl: '', stock: 50 },
+  { id: 1, name: 'Cà phê sữa đá', description: 'Cà phê phin đậm đà pha cùng sữa đặc, uống kèm đá.', category: 'Cà phê', price: 29000, imageUrl: '', stock: 50 },
+  { id: 2, name: 'Cà phê đen đá', description: 'Cà phê phin nguyên chất, vị đắng đậm.', category: 'Cà phê', price: 25000, imageUrl: '', stock: 50 },
+  { id: 3, name: 'Bạc xỉu', description: 'Nhiều sữa, ít cà phê, ngọt dịu.', category: 'Cà phê', price: 32000, imageUrl: '', stock: 50 },
+  { id: 4, name: 'Cappuccino', description: 'Espresso với lớp bọt sữa mịn.', category: 'Cà phê', price: 45000, imageUrl: '', stock: 50 },
+  { id: 5, name: 'Latte', description: 'Espresso pha nhiều sữa tươi nóng.', category: 'Cà phê', price: 45000, imageUrl: '', stock: 50 },
+  { id: 6, name: 'Trà đào cam sả', description: 'Trà đen, đào miếng, cam và sả thơm mát.', category: 'Trà', price: 39000, imageUrl: '', stock: 50 },
+  { id: 7, name: 'Trà sữa trân châu', description: 'Trà sữa đậm vị kèm trân châu đường đen.', category: 'Trà', price: 35000, imageUrl: '', stock: 50 },
+  { id: 8, name: 'Matcha latte', description: 'Bột matcha Nhật pha sữa tươi.', category: 'Trà', price: 49000, imageUrl: '', stock: 50 },
+  { id: 9, name: 'Sinh tố bơ', description: 'Bơ sáp xay cùng sữa đặc.', category: 'Đá xay', price: 45000, imageUrl: '', stock: 50 },
+  { id: 10, name: 'Chocolate đá xay', description: 'Chocolate xay đá, phủ kem tươi.', category: 'Đá xay', price: 49000, imageUrl: '', stock: 50 },
+    // Món thêm tạm của Búp, chưa có trong seed của Hùng
+  { id: 11, name: 'Trà dâu', description: 'Trà đen, mứt dâu tươi mát, kèm dâu tươi.', category: 'Trà', price: 39000, imageUrl: '', stock: 50 },
+  { id: 12, name: 'Trà nho', description: 'Trà đen, mứt nho tươi mát, kèm nho tươi.', category: 'Trà', price: 39000, imageUrl: '', stock: 50 },
+  { id: 13, name: 'Trà xoài', description: 'Trà đen, mứt xoài tươi mát, kèm xoài tươi miếng.', category: 'Trà', price: 39000, imageUrl: '', stock: 50 },
+  { id: 14, name: 'Cookie đá xay', description: 'Đá xay béo ngậy với bánh cookie, phủ kem tươi.', category: 'Đá xay', price: 55000, imageUrl: '', stock: 50 },
 ];
 
 function formatVnd(amount: number) {
@@ -31,10 +41,17 @@ function formatVnd(amount: number) {
 
 function getIcon(p: Product) {
   const name = p.name.toLowerCase();
+  if (name.includes('matcha')) return '🍵';
+  if (name.includes('trà sữa')) return '🧋';
   if (name.includes('đào')) return '🍑';
   if (name.includes('dâu')) return '🍓';
   if (name.includes('cookie')) return '🍪';
-  if (name.includes('latte')) return '🥛';
+  if (name.includes('bơ')) return '🥑';
+  if (name.includes('chocolate')) return '🍫';
+  if (name.includes('cappuccino')) return '☕';
+  if (name.includes('latte') || name.includes('bạc xỉu')) return '🥛';
+  if (name.includes('nho')) return '🍇';
+  if (name.includes('xoài')) return '🥭';
   if (p.category === 'Cà phê') return '☕';
   if (p.category === 'Trà') return '🍹';
   if (p.category === 'Đá xay') return '🥤';
