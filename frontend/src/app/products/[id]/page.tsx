@@ -21,6 +21,13 @@ type ProductDetail = {
 const USE_MOCK = true;
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
+const DRINK_IMAGES: Record<number, string> = {
+  1: 'ca-phe-sua-da', 2: 'ca-phe-den-da', 3: 'bac-xiu', 4: 'cappuccino', 5: 'latte',
+  6: 'tra-dao-cam-sa', 7: 'tra-sua-tran-chau', 8: 'matcha-latte', 9: 'sinh-to-bo',
+  10: 'chocolate-da-xay', 11: 'tra-dau', 12: 'tra-nho', 13: 'tra-xoai', 14: 'cookie-da-xay',
+};
+const imageOf = (id: number) => (DRINK_IMAGES[id] ? `/images/drinks/${DRINK_IMAGES[id]}.svg` : '');
+
 const MOCK_BASE: Record<
   number,
   { name: string; category: string; price: number; description: string }
@@ -96,7 +103,7 @@ async function fetchProduct(id: string): Promise<ProductDetail> {
     return {
       id: Number(id),
       ...base,
-      imageUrl: '',
+      imageUrl: imageOf(Number(id)),
       sizes: MOCK_SIZES,
       toppings: MOCK_TOPPINGS,
     };
@@ -155,7 +162,7 @@ function ProductDetail() {
     );
   }
 
-    if (status === 'notfound') {
+  if (status === 'notfound') {
     return (
       <main className="mx-auto max-w-2xl p-4 text-center">
         <p className="mt-10 text-lg font-semibold">Không tìm thấy món này</p>
