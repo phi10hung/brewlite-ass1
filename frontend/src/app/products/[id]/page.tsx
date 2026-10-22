@@ -84,9 +84,15 @@ function getIcon(name: string, category: string) {
   return '🧋';
 }
 
+class NotFoundError extends Error {}
+
+type Status = 'loading' | 'ready' | 'notfound' | 'error';
+
 async function fetchProduct(id: string): Promise<ProductDetail> {
   if (USE_MOCK) {
+    await new Promise((r) => setTimeout(r, 400)); // giả lập độ trễ mạng
     const base = MOCK_BASE[Number(id)];
+    if (!base) throw new NotFoundError();
     return {
       id: Number(id),
       ...base,
@@ -96,19 +102,86 @@ async function fetchProduct(id: string): Promise<ProductDetail> {
     };
   }
   const res = await fetch(`${API_URL}/products/${id}`);
+  if (res.status === 404) throw new NotFoundError();
+  if (!res.ok) throw new Error('fetch-failed');
   return res.json();
+}
+
+// Chưa có API giỏ hàng nên tạm giả lập; khi nhóm chốt API thì thay phần này
+async function addToCart(item: {
+  productId: number;
+  size: Size;
+  toppingIds: number[];
+  quantity: number;
+  unitPrice: number;
+}) {
+  await new Promise((r) => setTimeout(r, 600));
+  console.info('Thêm vào giỏ (giả lập):', item);
 }
 
 function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const [product, setProduct] = useState<ProductDetail | null>(null);
+  const [status, setStatus] = useState<Status>('loading');
+  const [reloadKey, setReloadKey] = useState(0);
   const [size, setSize] = useState<Size>('S');
   const [toppingIds, setToppingIds] = useState<number[]>([]);
   const [quantity, setQuantity] = useState(1);
+  const [adding, setAdding] = useState(false);
+  const [addMessage, setAddMessage] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
-    fetchProduct(id).then(setProduct);
-  }, [id]);
+    let cancelled = false;
+    fetchProduct(id)
+      .then((p) => {
+        if (cancelled) return;
+        setProduct(p);
+        setStatus('ready');
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setStatus(e instanceof NotFoundError ? 'notfound' : 'error');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id, reloadKey]);
+
+  if (status === 'loading') {
+    return (
+      <main className="mx-auto max-w-2xl p-4">
+        <p className="text-gray-500">Đang tải món...</p>
+      </main>
+    );
+  }
+
+    if (status === 'notfound') {
+    return (
+      <main className="mx-auto max-w-2xl p-4 text-center">
+        <p className="mt-10 text-lg font-semibold">Không tìm thấy món này</p>
+        <Link href="/" className="mt-3 inline-block text-amber-700 underline">
+          ← Về Menu
+        </Link>
+      </main>
+    );
+  }
+
+  if (status === 'error') {
+    return (
+      <main className="mx-auto max-w-2xl p-4 text-center">
+        <p className="mt-10 text-lg font-semibold">Không tải được dữ liệu</p>
+        <button
+          onClick={() => {
+            setStatus('loading');
+            setReloadKey((k) => k + 1);
+          }}
+          className="mt-3 rounded bg-amber-700 px-4 py-2 text-white"
+        >
+          Thử lại
+        </button>
+      </main>
+    );
+  }
 
   if (!product) return null;
 
@@ -121,6 +194,19 @@ function ProductDetail() {
 
   const toggleTopping = (tid: number) =>
     setToppingIds((prev) => (prev.includes(tid) ? prev.filter((x) => x !== tid) : [...prev, tid]));
+
+  const handleAdd = async () => {
+    setAdding(true);
+    setAddMessage(null);
+    try {
+      await addToCart({ productId: product.id, size, toppingIds, quantity, unitPrice });
+      setAddMessage({ type: 'ok', text: 'Đã thêm vào giỏ hàng' });
+    } catch {
+      setAddMessage({ type: 'error', text: 'Không thêm được vào giỏ, thử lại nhé' });
+    } finally {
+      setAdding(false);
+    }
+  };
 
   return (
     <main className="mx-auto max-w-2xl p-4">
@@ -193,6 +279,22 @@ function ProductDetail() {
       <p className="mt-6 text-xl font-semibold">
         Tổng: <span className="text-amber-700">{formatVnd(total)}</span>
       </p>
+
+      <button
+        onClick={handleAdd}
+        disabled={adding}
+        className="mt-4 w-full rounded bg-amber-700 py-3 font-semibold text-white disabled:opacity-60"
+      >
+        {adding ? 'Đang thêm...' : 'Thêm vào giỏ'}
+      </button>
+      {addMessage && (
+        <p
+          role="status"
+          className={`mt-2 text-center ${addMessage.type === 'ok' ? 'text-green-700' : 'text-red-600'}`}
+        >
+          {addMessage.text}
+        </p>
+      )}
     </main>
   );
 }
