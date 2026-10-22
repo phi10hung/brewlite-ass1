@@ -1,6 +1,14 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
 export default function Footer() {
+  const [year, setYear] = useState<number | null>(null);
+
+  useEffect(() => {
+    setYear(new Date().getFullYear());
+  }, []);
   return (
     <footer className="mt-auto border-t bg-stone-100">
       <div className="mx-auto max-w-7xl px-4 py-6
@@ -15,7 +23,7 @@ export default function Footer() {
           Cà phê ngon, ngày thêm vui.
         </p>
         <p className="mt-1">
-          © {new Date().getFullYear()} BrewLite
+          © {year ?? "2026"} BrewLite
         </p>
       </div>
     </footer>

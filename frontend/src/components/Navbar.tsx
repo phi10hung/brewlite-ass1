@@ -13,10 +13,7 @@ export default function Navbar() {
   const logout = useAuthStore((s) => s.logout);
 
   // Thay bằng số lượng thực khi tích hợp cart store
-  const cartCount = items.reduce(
-    (total, item) => total + item.quantity,
-    0
-  );
+  const cartCount = 0;
 
   function handleLogout() {
     logout();
