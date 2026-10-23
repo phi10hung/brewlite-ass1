@@ -13,7 +13,8 @@
 - [x] Tăng, giảm số lượng (từ 1 đến 20)
 - [x] Tổng tiền cập nhật ngay khi đổi lựa chọn: (giá gốc + size + topping) × số lượng
       Ví dụ: Latte size L + Kem cheese, số lượng 2 = 134.000đ
-- [x] Có nút "Thêm vào giỏ" và thông báo khi thêm thành công
+- [x] Bấm "Thêm vào giỏ" thì món (kèm size, topping, số lượng, giá) được thêm vào giỏ hàng, hiện "Đã thêm vào giỏ hàng" và số trên thanh menu tăng
 - [x] Đang tải thì hiện thông báo; lỗi thì có nút "Thử lại"; món không tồn tại thì báo "Không tìm thấy món này"
+- [x] Dữ liệu món, size, topping lấy từ API `GET /products/:id`
 
-**Ghi chú:** nút "Thêm vào giỏ" hiện đang giả lập, sẽ nối với giỏ hàng (Task 5 của Linh) khi phần đó hoàn thành.
+**Ghi chú:** nút "Thêm vào giỏ" gọi `addItem` của giỏ hàng (Task 5 của Linh). Đã bỏ dữ liệu giả.
