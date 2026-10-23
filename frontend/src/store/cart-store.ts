@@ -7,6 +7,7 @@ export type CartItem = {
   name: string;
   imageUrl: string;
   size: "S" | "M" | "L";
+  toppingIds: number[];
   toppings: string[];
   unitPrice: number;
   quantity: number;
@@ -31,8 +32,9 @@ type CartState = {
   totalPrice: () => number;
 };
 
-const sameToppings = (a: string[], b: string[]) =>
-  [...a].sort().join("|") === [...b].sort().join("|");
+const sameToppingIds = (a: number[], b: number[]) =>
+  [...a].sort((x, y) => x - y).join("|") ===
+  [...b].sort((x, y) => x - y).join("|");
 
 export const useCartStore = create<CartState>()(
   persist(
@@ -45,7 +47,7 @@ export const useCartStore = create<CartState>()(
             (current) =>
               current.productId === item.productId &&
               current.size === item.size &&
-              sameToppings(current.toppings, item.toppings)
+              sameToppingIds(current.toppingIds, item.toppingIds)
           );
 
           if (existing) {
@@ -61,7 +63,7 @@ export const useCartStore = create<CartState>()(
           return { items: [...state.items, { ...item }] };
         }),
 
-      updateQuantity: (productId, size, toppings, quantity) =>
+      updateQuantity: (productId, size, toppingIds, quantity) =>
         set((state) => ({
           items:
             quantity <= 0
@@ -70,26 +72,26 @@ export const useCartStore = create<CartState>()(
                     !(
                       item.productId === productId &&
                       item.size === size &&
-                      sameToppings(item.toppings, toppings)
+                      sameToppings(item.toppingIds, toppingIds)
                     )
                 )
               : state.items.map((item) =>
                   item.productId === productId &&
                   item.size === size &&
-                  sameToppings(item.toppings, toppings)
+                  sameToppings(item.toppingIds, toppingIds)
                     ? { ...item, quantity: Math.floor(quantity) }
                     : item
                 ),
         })),
 
-      removeItem: (productId, size, toppings) =>
+      removeItem: (productId, size, toppingIds) =>
         set((state) => ({
           items: state.items.filter(
             (item) =>
               !(
                 item.productId === productId &&
                 item.size === size &&
-                sameToppings(item.toppings, toppings)
+                sameToppings(item.toppingIds, toppingIds)
               )
           ),
         })),
