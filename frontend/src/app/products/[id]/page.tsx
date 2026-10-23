@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { useCartStore } from '@/store/cart-store';
 
 type Size = 'S' | 'M' | 'L';
 type Topping = { id: number; name: string; price: number };
@@ -53,18 +54,6 @@ async function fetchProduct(id: string): Promise<ProductDetail> {
   return res.json();
 }
 
-// Chưa có API giỏ hàng nên tạm giả lập; khi nhóm chốt API thì thay phần này
-async function addToCart(item: {
-  productId: number;
-  size: Size;
-  toppingIds: number[];
-  quantity: number;
-  unitPrice: number;
-}) {
-  await new Promise((r) => setTimeout(r, 600));
-  console.info('Thêm vào giỏ (giả lập):', item);
-}
-
 function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const [product, setProduct] = useState<ProductDetail | null>(null);
@@ -75,6 +64,7 @@ function ProductDetail() {
   const [quantity, setQuantity] = useState(1);
   const [adding, setAdding] = useState(false);
   const [addMessage, setAddMessage] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
+  const addItem = useCartStore((s) => s.addItem);
 
   useEffect(() => {
     let cancelled = false;
@@ -145,7 +135,18 @@ function ProductDetail() {
     setAdding(true);
     setAddMessage(null);
     try {
-      await addToCart({ productId: product.id, size, toppingIds, quantity, unitPrice });
+      addItem({
+                productId: product.id,
+                name: product.name,
+                imageUrl: product.imageUrl,
+                size,
+                toppingIds,
+                toppings: product.toppings
+                  .filter((t) => toppingIds.includes(t.id))
+                  .map((t) => t.name),
+                unitPrice,
+                quantity,
+      });
       setAddMessage({ type: 'ok', text: 'Đã thêm vào giỏ hàng' });
     } catch {
       setAddMessage({ type: 'error', text: 'Không thêm được vào giỏ, thử lại nhé' });
