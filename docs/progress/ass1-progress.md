@@ -107,6 +107,7 @@
 | 2 | 23/10/2026 | Phân công | Mock Payment, POST /payments chuyển đơn PAID/PAYMENT_FAILED qua assertTransition | Triệu | #13 |
 |  |  | Bổ sung | Mock Payment Service (Ví/Thẻ, giả lập lỗi), API POST /payments yêu cầu đăng nhập, chỉ thanh toán đơn của mình, chuyển đơn PAID/PAYMENT_FAILED qua assertTransition, cho thanh toán lại sau lỗi, unit test, User Story | Triệu | #13, PR #41 |
 |  |  | Chỉnh sửa | Duyệt và merge PR #41 vào develop | Hùng | PR #41 |
+|  |  | Phân công | Đợt 3: ráp hẳn Checkout (gửi token đăng nhập, chưa đăng nhập thì chuyển sang trang đăng nhập), sửa hiển thị tên topping | Linh | #14 |
 
 ## Task 9 – Xác nhận, lịch sử đơn và bàn giao
 
@@ -115,6 +116,9 @@
 | 1 | 21/10/2026 | Phân công | API GET /orders/me, GET /orders/:id | Quang | #15 |
 |  |  | Phân công | Màn hình xác nhận đơn và lịch sử đơn | Khoa | #16 |
 |  |  | Phân công | Docker hoá frontend + backend, README, demo end-to-end | Hùng | #17 |
+| 2 | 23/10/2026 | Phân công | Đợt 3: API GET /orders/me, GET /orders/:id (làm trước để Khoa dùng) | Quang | #15 |
+|  |  | Phân công | Đợt 3: màn hình xác nhận đơn và lịch sử đơn | Khoa | #16 |
+|  |  | Phân công | Đợt 3: Docker hoá frontend, backend, demo trọn luồng | Hùng | #17 |
 
 ## Task 10 – Nghiệp vụ backend nâng cao
 
@@ -130,6 +134,10 @@
 |  |  | Bổ sung | User Story Order State Machine | Triệu | PR #33 |
 |  |  | Chỉnh sửa | Duyệt và merge PR #33 vào develop | Hùng | PR #33 |
 |  |  | Bổ sung | Thanh toán idempotent: lưu Idempotency-Key, cùng key trả lại kết quả cũ không tạo thanh toán mới, khác dữ liệu báo 409, xử lý 2 yêu cầu đồng thời; test (b), User Story Task 10b | Triệu | #19, PR #41 |
+|  |  | Phân công | Đợt 3: kiểm soát tồn kho khi đặt đồng thời + test (c) | Quang | #20 |
+|  |  | Phân công | Đợt 3: khuyến mãi và điểm thưởng (backend) | Triệu | #21 |
+|  |  | Phân công | Đợt 3: giao diện mã giảm giá, điểm thưởng | Linh | #23 |
+|  |  | Phân công | Đợt 3: màn hình nhân viên cập nhật trạng thái đơn | Búp | #43 |
 
 ## Tài liệu – User Story và bảng tiến độ
 
