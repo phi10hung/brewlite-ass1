@@ -1,174 +1,175 @@
-"use client";
+'use client';
 
-import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
-import { apiFetch } from "@/lib/api";
-import { formatVnd } from "@/lib/format";
-import type { Product } from "@/lib/types";
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
 
-export default function HomePage() {
+type Product = {
+  id: number;
+  name: string;
+  description: string;
+  category: string;
+  price: number;
+  imageUrl: string;
+  stock: number;
+};
+
+// true = dùng dữ liệu giả; đổi thành false khi API của Quang chạy được
+const USE_MOCK = true;
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+
+const DRINK_IMAGES: Record<number, string> = {
+  1: 'ca-phe-sua-da', 2: 'ca-phe-den-da', 3: 'bac-xiu', 4: 'cappuccino', 5: 'latte',
+  6: 'tra-dao-cam-sa', 7: 'tra-sua-tran-chau', 8: 'matcha-latte', 9: 'sinh-to-bo',
+  10: 'chocolate-da-xay', 11: 'tra-dau', 12: 'tra-nho', 13: 'tra-xoai', 14: 'cookie-da-xay',
+};
+const imageOf = (id: number) => (DRINK_IMAGES[id] ? `/images/drinks/${DRINK_IMAGES[id]}.svg` : '');
+
+const MOCK_PRODUCTS: Product[] = [
+  { id: 1, name: 'Cà phê sữa đá', description: 'Cà phê phin đậm đà pha cùng sữa đặc, uống kèm đá.', category: 'Cà phê', price: 29000, imageUrl: imageOf(1), stock: 50 },
+  { id: 2, name: 'Cà phê đen đá', description: 'Cà phê phin nguyên chất, vị đắng đậm.', category: 'Cà phê', price: 25000, imageUrl: imageOf(2), stock: 50 },
+  { id: 3, name: 'Bạc xỉu', description: 'Nhiều sữa, ít cà phê, ngọt dịu.', category: 'Cà phê', price: 32000, imageUrl: imageOf(3), stock: 50 },
+  { id: 4, name: 'Cappuccino', description: 'Espresso với lớp bọt sữa mịn.', category: 'Cà phê', price: 45000, imageUrl: imageOf(4), stock: 50 },
+  { id: 5, name: 'Latte', description: 'Espresso pha nhiều sữa tươi nóng.', category: 'Cà phê', price: 45000, imageUrl: '', stock: 50 },
+  { id: 6, name: 'Trà đào cam sả', description: 'Trà đen, đào miếng, cam và sả thơm mát.', category: 'Trà', price: 39000, imageUrl: '', stock: 50 },
+  { id: 7, name: 'Trà sữa trân châu', description: 'Trà sữa đậm vị kèm trân châu đường đen.', category: 'Trà', price: 35000, imageUrl: '', stock: 50 },
+  { id: 8, name: 'Matcha latte', description: 'Bột matcha Nhật pha sữa tươi.', category: 'Trà', price: 49000, imageUrl: '', stock: 50 },
+  { id: 9, name: 'Sinh tố bơ', description: 'Bơ sáp xay cùng sữa đặc.', category: 'Đá xay', price: 45000, imageUrl: '', stock: 50 },
+  { id: 10, name: 'Chocolate đá xay', description: 'Chocolate xay đá, phủ kem tươi.', category: 'Đá xay', price: 49000, imageUrl: '', stock: 50 },
+    // Món thêm tạm của Búp, chưa có trong seed của Hùng
+  { id: 11, name: 'Trà dâu', description: 'Trà đen, mứt dâu tươi mát, kèm dâu tươi.', category: 'Trà', price: 39000, imageUrl: '', stock: 50 },
+  { id: 12, name: 'Trà nho', description: 'Trà đen, mứt nho tươi mát, kèm nho tươi.', category: 'Trà', price: 39000, imageUrl: '', stock: 50 },
+  { id: 13, name: 'Trà xoài', description: 'Trà đen, mứt xoài tươi mát, kèm xoài tươi miếng.', category: 'Trà', price: 39000, imageUrl: '', stock: 50 },
+  { id: 14, name: 'Cookie đá xay', description: 'Đá xay béo ngậy với bánh cookie, phủ kem tươi.', category: 'Đá xay', price: 55000, imageUrl: '', stock: 50 },
+];
+
+function formatVnd(amount: number) {
+  return amount.toLocaleString('vi-VN') + 'đ';
+}
+
+function getIcon(p: Product) {
+  const name = p.name.toLowerCase();
+  if (name.includes('matcha')) return '🍵';
+  if (name.includes('trà sữa')) return '🧋';
+  if (name.includes('đào')) return '🍑';
+  if (name.includes('dâu')) return '🍓';
+  if (name.includes('cookie')) return '🍪';
+  if (name.includes('bơ')) return '🥑';
+  if (name.includes('chocolate')) return '🍫';
+  if (name.includes('cappuccino')) return '☕';
+  if (name.includes('latte') || name.includes('bạc xỉu')) return '🥛';
+  if (name.includes('nho')) return '🍇';
+  if (name.includes('xoài')) return '🥭';
+  if (p.category === 'Cà phê') return '☕';
+  if (p.category === 'Trà') return '🍹';
+  if (p.category === 'Đá xay') return '🥤';
+  return '🧋';
+}
+
+async function fetchProducts(): Promise<Product[]> {
+  if (USE_MOCK) {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    return MOCK_PRODUCTS.map((p) => ({ ...p, imageUrl: imageOf(p.id) }));
+  }
+  const res = await fetch(`${API_URL}/products`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.message ?? 'Không tải được danh sách món');
+  }
+  return res.json();
+}
+
+export default function MenuPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [category, setCategory] = useState("Tất cả");
-
-  const loadProducts = useCallback(async () => {
-    setLoading(true);
-    setError("");
-
-    try {
-      const data = await apiFetch<Product[]>("/products");
-      setProducts(data);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Đã xảy ra lỗi khi tải menu."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const [error, setError] = useState<string | null>(null);
+  const [category, setCategory] = useState('Tất cả');
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    void loadProducts();
-  }, [loadProducts]);
+    let cancelled = false;
+    fetchProducts()
+      .then((data) => {
+        if (!cancelled) setProducts(data);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Có lỗi xảy ra');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
 
-  const categories = ["Tất cả", "Cà phê", "Trà", "Đá xay"];
+  const retry = () => {
+    setLoading(true);
+    setError(null);
+    setReloadKey((k) => k + 1);
+  };
 
-  const filteredProducts =
-    category === "Tất cả"
-      ? products
-      : products.filter(
-          (p) => p.category === category
-        );
+  const categories = ['Tất cả', ...Array.from(new Set(products.map((p) => p.category)))];
+  const shown = category === 'Tất cả' ? products : products.filter((p) => p.category === category);
 
   return (
-    <div className="mx-auto min-h-[60vh] max-w-7xl
-      px-4 py-8 sm:px-6 sm:py-12">
+    <main className="mx-auto max-w-6xl p-4">
+      <h1 className="mb-4 text-2xl font-bold">Thực đơn</h1>
 
-      <section className="mb-8 rounded-2xl bg-amber-950
-        px-5 py-8 text-white sm:px-10 sm:py-12">
-        <p className="text-sm font-medium text-amber-200">
-          CHÀO MỪNG ĐẾN BREWLITE
-        </p>
-        <h1 className="mt-2 text-3xl font-bold sm:text-5xl">
-          Một chút cà phê,
-          <br />
-          thêm nhiều niềm vui.
-        </h1>
-        <p className="mt-3 max-w-lg text-sm text-amber-100 sm:text-base">
-          Khám phá những thức uống yêu thích của bạn.
-        </p>
-      </section>
+      {loading && <p className="py-10 text-center text-gray-500">Đang tải...</p>}
 
-      <div className="mb-6 flex flex-wrap items-center
-        justify-between gap-3">
-        <h2 className="text-2xl font-bold text-stone-900">
-          Menu đồ uống
-        </h2>
-
-        <div className="flex flex-wrap gap-2">
-          {categories.map((item) => (
-            <button
-              key={item}
-              onClick={() => setCategory(item)}
-              className={`rounded-full px-3 py-2 text-sm
-                transition ${
-                  category === item
-                    ? "bg-amber-900 text-white"
-                    : "bg-white text-stone-700 ring-1 ring-stone-200"
-                }`}
-            >
-              {item}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="grid grid-cols-2 gap-4
-          md:grid-cols-3 lg:grid-cols-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div
-              key={i}
-              className="animate-pulse overflow-hidden
-                rounded-2xl bg-white"
-            >
-              <div className="aspect-square bg-stone-200" />
-              <div className="space-y-3 p-4">
-                <div className="h-4 rounded bg-stone-200" />
-                <div className="h-4 w-2/3 rounded bg-stone-200" />
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : error ? (
-        <div className="rounded-2xl border border-red-200
-          bg-red-50 p-6 text-center">
-          <p className="font-semibold text-red-800">
-            Không tải được menu
-          </p>
-          <p className="mt-2 text-sm text-red-700">
-            {error}
-          </p>
-          <button
-            onClick={() => void loadProducts()}
-            className="mt-4 rounded-lg bg-red-700
-              px-4 py-2 font-medium text-white"
-          >
+      {!loading && error && (
+        <div className="py-10 text-center">
+          <p className="mb-3 text-red-600">{error}</p>
+          <button onClick={retry} className="rounded bg-amber-700 px-4 py-2 text-white">
             Thử lại
           </button>
         </div>
-      ) : filteredProducts.length === 0 ? (
-        <div className="rounded-2xl bg-white p-10
-          text-center text-stone-500">
-          Chưa có món nào.
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-4
-          md:grid-cols-3 lg:grid-cols-4">
-          {filteredProducts.map((p) => (
-            <Link
-              key={p.id}
-              href={`/products/${p.id}`}
-              className="group overflow-hidden rounded-2xl
-                border border-stone-200 bg-white
-                transition hover:-translate-y-1
-                hover:shadow-lg"
-            >
-              <div className="aspect-square overflow-hidden
-                bg-stone-100">
-                {p.image ? (
-                  <img
-                    src={p.image}
-                    alt={p.name}
-                    className="h-full w-full object-cover
-                      transition group-hover:scale-105"
-                  />
+      )}
+
+      {!loading && !error && products.length === 0 && (
+        <p className="py-10 text-center text-gray-500">Chưa có món nào</p>
+      )}
+
+      {!loading && !error && products.length > 0 && (
+        <>
+          <div className="mb-4 flex flex-wrap gap-2">
+            {categories.map((c) => (
+              <button
+                key={c}
+                onClick={() => setCategory(c)}
+                className={`rounded-full border px-3 py-1 text-sm ${
+                  category === c ? 'bg-amber-700 text-white' : 'bg-white text-gray-700'
+                }`}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+            {shown.map((p) => (
+              <Link
+                key={p.id}
+                href={`/products/${p.id}`}
+                className="overflow-hidden rounded-lg border bg-white shadow-sm hover:shadow-md"
+              >
+                {p.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={p.imageUrl} alt={p.name} className="aspect-square w-full object-cover" />
                 ) : (
-                  <div className="flex h-full items-center
-                    justify-center text-5xl"
-                    aria-label="Chưa có ảnh sản phẩm"
-                  >
-                    ☕
+                  <div className="flex aspect-square w-full items-center justify-center bg-amber-50 text-4xl">
+                    {getIcon(p)}
                   </div>
                 )}
-              </div>
-
-              <div className="p-3 sm:p-4">
-                <h3 className="line-clamp-2 min-h-10
-                  font-semibold text-stone-900">
-                  {p.name}
-                </h3>
-                <p className="mt-2 font-bold text-amber-900">
-                  {formatVnd(p.price)}
-                </p>
-              </div>
-            </Link>
-          ))}
-        </div>
+                <div className="p-3">
+                  <h2 className="font-semibold">{p.name}</h2>
+                  <p className="text-amber-700">{formatVnd(p.price)}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </>
       )}
-    </div>
+    </main>
   );
 }
