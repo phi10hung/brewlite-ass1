@@ -6,6 +6,7 @@ import { AuthModule } from './auth/auth.module';
 import { HealthController } from './health.controller';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProductsModule } from './products/products.module';
+import { OrdersModule } from './orders/orders.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { ProductsModule } from './products/products.module';
     PrismaModule,
     ProductsModule,
     AuthModule,
+    OrdersModule,
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],
