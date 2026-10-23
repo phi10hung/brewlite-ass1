@@ -137,12 +137,7 @@ export default function CheckoutPage() {
           items: items.map((item) => ({
             productId: item.productId,
             size: item.size,
-
-            // Store hiện tại của Linh đang lưu topping dạng string[].
-            // Backend thật có thể yêu cầu toppingIds,
-            // nên đoạn này sẽ nối lại sau khi types/API của nhóm merge.
             toppingIds: item.toppingIds,
-
             quantity: item.quantity,
           })),
 
@@ -269,7 +264,7 @@ export default function CheckoutPage() {
             <div className="mt-4 divide-y divide-neutral-800">
               {items.map((item) => (
                 <div
-                  key={`${item.productId}-${item.size}-${item.toppings
+                  key={`${item.productId}-${item.size}-${item.toppingIds
                     .slice()
                     .sort()
                     .join("-")}`}
@@ -284,9 +279,9 @@ export default function CheckoutPage() {
                       Size {item.size}
                     </p>
 
-                    {item.toppings.length > 0 && (
+                    {item.toppingIds.length > 0 && (
                       <p className="mt-1 text-sm text-neutral-400">
-                        {item.toppings.join(", ")}
+                        {item.toppingIds.join(", ")}
                       </p>
                     )}
 

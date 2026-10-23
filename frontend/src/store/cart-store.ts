@@ -25,7 +25,7 @@ type CartState = {
   removeItem: (
     productId: number,
     size: CartItem["size"],
-    toppingIDs: number[]
+    toppingIds: number[]
   ) => void;
   clear: () => void;
   totalItems: () => number;
@@ -113,6 +113,9 @@ totalPrice: () =>
 {
   name: "brewlite-cart",
       storage: createJSONStorage(() => localStorage),
+      // Giỏ cũ (trước khi có toppingIds) không dùng được nữa → xoá trống
+      version: 1,
+      migrate: () => ({ items: [] }),
     }
   )
 );
