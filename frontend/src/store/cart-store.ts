@@ -19,13 +19,13 @@ type CartState = {
   updateQuantity: (
     productId: number,
     size: CartItem["size"],
-    toppings: string[],
+    toppingIds: number[],
     quantity: number
   ) => void;
   removeItem: (
     productId: number,
     size: CartItem["size"],
-    toppings: string[]
+    toppingIDs: number[]
   ) => void;
   clear: () => void;
   totalItems: () => number;
@@ -72,13 +72,13 @@ export const useCartStore = create<CartState>()(
                     !(
                       item.productId === productId &&
                       item.size === size &&
-                      sameToppings(item.toppingIds, toppingIds)
+                      sameToppingIds(item.toppingIds, toppingIds)
                     )
                 )
               : state.items.map((item) =>
                   item.productId === productId &&
                   item.size === size &&
-                  sameToppings(item.toppingIds, toppingIds)
+                  sameToppingIds(item.toppingIds, toppingIds)
                     ? { ...item, quantity: Math.floor(quantity) }
                     : item
                 ),
@@ -91,7 +91,7 @@ export const useCartStore = create<CartState>()(
               !(
                 item.productId === productId &&
                 item.size === size &&
-                sameToppings(item.toppingIds, toppingIds)
+                sameToppingIds(item.toppingIds, toppingIds)
               )
           ),
         })),

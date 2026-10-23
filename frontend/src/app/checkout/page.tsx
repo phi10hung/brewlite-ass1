@@ -141,7 +141,7 @@ export default function CheckoutPage() {
             // Store hiện tại của Linh đang lưu topping dạng string[].
             // Backend thật có thể yêu cầu toppingIds,
             // nên đoạn này sẽ nối lại sau khi types/API của nhóm merge.
-            toppings: item.toppings,
+            toppingIds: item.toppingIds,
 
             quantity: item.quantity,
           })),
