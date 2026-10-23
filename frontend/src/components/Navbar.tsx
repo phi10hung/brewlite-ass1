@@ -1,18 +1,28 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useSyncExternalStore } from "react";
+import { useAuthStore } from "@/store/auth";
 import { useCartStore } from "@/store/cart-store";
 
-// Giỏ hàng lưu trong trình duyệt (localStorage), nên chỉ hiện số lượng
-// sau khi trang đã tải xong ở trình duyệt, tránh lỗi lệch giao diện.
+// Giỏ hàng và thông tin đăng nhập lưu trong trình duyệt (localStorage), nên chỉ
+// hiện sau khi trang đã tải xong ở trình duyệt, tránh lỗi lệch giao diện.
 const subscribe = () => () => {};
 const useIsClient = () =>
   useSyncExternalStore(subscribe, () => true, () => false);
 
 export default function Navbar() {
+  const router = useRouter();
   const isClient = useIsClient();
   const cartCount = useCartStore((s) => s.totalItems());
+  const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
+
+  function handleLogout() {
+    logout();
+    router.replace("/");
+  }
 
   return (
     <header className="sticky top-0 z-50 border-b bg-white">
@@ -38,6 +48,29 @@ export default function Navbar() {
               </span>
             )}
           </Link>
+
+          {/* Đã đăng nhập: hiện tên + nút Đăng xuất; chưa đăng nhập: nút Đăng nhập */}
+          {isClient && user ? (
+            <>
+              <span className="hidden max-w-32 truncate font-medium sm:block">
+                {user.name}
+              </span>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="rounded-lg border px-3 py-2 hover:bg-stone-100"
+              >
+                Đăng xuất
+              </button>
+            </>
+          ) : (
+            <Link
+              href="/login"
+              className="rounded-lg bg-amber-900 px-3 py-2 text-white"
+            >
+              Đăng nhập
+            </Link>
+          )}
         </div>
       </nav>
     </header>
