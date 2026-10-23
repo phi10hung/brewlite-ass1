@@ -1,25 +1,18 @@
-
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useAuthStore } from "@/store/auth";
+import { useSyncExternalStore } from "react";
+import { useCartStore } from "@/store/cart-store";
+
+// Giỏ hàng lưu trong trình duyệt (localStorage), nên chỉ hiện số lượng
+// sau khi trang đã tải xong ở trình duyệt, tránh lỗi lệch giao diện.
+const subscribe = () => () => {};
+const useIsClient = () =>
+  useSyncExternalStore(subscribe, () => true, () => false);
 
 export default function Navbar() {
-  const router = useRouter();
-
-  const user = useAuthStore((s) => s.user);
-  const hydrated = useAuthStore((s) => s.hydrated);
-  const logout = useAuthStore((s) => s.logout);
-
-  // Thay bằng số lượng thực khi tích hợp cart store
-  const cartCount = 0;
-
-  function handleLogout() {
-    logout();
-    router.replace("/");
-    router.refresh();
-  }
+  const isClient = useIsClient();
+  const cartCount = useCartStore((s) => s.totalItems());
 
   return (
     <header className="sticky top-0 z-50 border-b bg-white">
@@ -34,41 +27,17 @@ export default function Navbar() {
           </Link>
 
           <Link
-            href="/orders"
-            className="hidden hover:text-amber-700 sm:block"
-          >
-            Lịch sử đơn
-          </Link>
-
-          <Link
             href="/cart"
-            className="rounded-lg bg-amber-100 px-2 py-2 text-amber-950"
+            aria-label="Giỏ hàng"
+            className="relative rounded-lg bg-amber-100 px-3 py-2 text-amber-950"
           >
-            🛒 <span>{cartCount}</span>
-          </Link>
-
-          {hydrated && user ? (
-            <>
-              <span className="hidden max-w-32 truncate font-medium sm:block">
-                {user.name}
+            🛒
+            {isClient && cartCount > 0 && (
+              <span className="absolute -right-2 -top-2 min-w-5 rounded-full bg-red-600 px-1 text-center text-xs font-bold text-white">
+                {cartCount}
               </span>
-              <button
-                onClick={handleLogout}
-                className="rounded-lg border px-3 py-2 hover:bg-stone-100"
-              >
-                Đăng xuất
-              </button>
-            </>
-          ) : hydrated ? (
-            <Link
-              href="/login"
-              className="rounded-lg bg-amber-900 px-3 py-2 text-white"
-            >
-              Đăng nhập
-            </Link>
-          ) : (
-            <span className="text-stone-400">...</span>
-          )}
+            )}
+          </Link>
         </div>
       </nav>
     </header>
