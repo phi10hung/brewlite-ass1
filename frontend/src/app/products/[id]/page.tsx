@@ -17,56 +17,7 @@ type ProductDetail = {
   toppings: Topping[];
 };
 
-// true = dùng dữ liệu giả; đổi thành false khi API của Quang chạy được
-const USE_MOCK = false;
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
-
-const DRINK_IMAGES: Record<number, string> = {
-  1: 'ca-phe-sua-da', 2: 'ca-phe-den-da', 3: 'bac-xiu', 4: 'cappuccino', 5: 'latte',
-  6: 'tra-dao-cam-sa', 7: 'tra-sua-tran-chau', 8: 'matcha-latte', 9: 'sinh-to-bo',
-  10: 'chocolate-da-xay', 11: 'tra-dau', 12: 'tra-nho', 13: 'tra-xoai', 14: 'cookie-da-xay',
-};
-const imageOf = (id: number) => (DRINK_IMAGES[id] ? `/images/drinks/${DRINK_IMAGES[id]}.svg` : '');
-
-const MOCK_BASE: Record<
-  number,
-  { name: string; category: string; price: number; description: string }
-> = {
-  1: { name: 'Cà phê sữa đá', category: 'Cà phê', price: 29000, description: 'Cà phê phin đậm đà pha cùng sữa đặc, uống kèm đá.' },
-  2: { name: 'Cà phê đen đá', category: 'Cà phê', price: 25000, description: 'Cà phê phin nguyên chất, vị đắng đậm.' },
-  3: { name: 'Bạc xỉu', category: 'Cà phê', price: 32000, description: 'Nhiều sữa, ít cà phê, ngọt dịu.' },
-  4: { name: 'Cappuccino', category: 'Cà phê', price: 45000, description: 'Espresso với lớp bọt sữa mịn.' },
-  5: { name: 'Latte', category: 'Cà phê', price: 45000, description: 'Espresso pha nhiều sữa tươi nóng.' },
-  6: { name: 'Trà đào cam sả', category: 'Trà', price: 39000, description: 'Trà đen, đào miếng, cam và sả thơm mát.' },
-  7: { name: 'Trà sữa trân châu', category: 'Trà', price: 35000, description: 'Trà sữa đậm vị kèm trân châu đường đen.' },
-  8: { name: 'Matcha latte', category: 'Trà', price: 49000, description: 'Bột matcha Nhật pha sữa tươi.' },
-  9: { name: 'Sinh tố bơ', category: 'Đá xay', price: 45000, description: 'Bơ sáp xay cùng sữa đặc.' },
-  10: { name: 'Chocolate đá xay', category: 'Đá xay', price: 49000, description: 'Chocolate xay đá, phủ kem tươi.' },
-  // Món thêm tạm của Búp, chưa có trong seed của Hùng
-  11: { name: 'Trà dâu', category: 'Trà', price: 39000, description: 'Trà đen, mứt dâu tươi mát, kèm dâu tươi.' },
-  12: { name: 'Trà nho', category: 'Trà', price: 39000, description: 'Trà đen, mứt nho tươi mát, kèm nho tươi.' },
-  13: { name: 'Trà xoài', category: 'Trà', price: 39000, description: 'Trà đen, mứt xoài tươi mát, kèm xoài tươi miếng.' },
-  14: { name: 'Cookie đá xay', category: 'Đá xay', price: 55000, description: 'Đá xay béo ngậy với bánh cookie, phủ kem tươi.' },
-};
-
-const MOCK_SIZES: ProductDetail['sizes'] = [
-  { size: 'S', extra: 0 },
-  { size: 'M', extra: 5000 },
-  { size: 'L', extra: 10000 },
-];
-
-const MOCK_TOPPINGS: Topping[] = [
-  { id: 1, name: 'Trân châu đen', price: 8000 },
-  { id: 2, name: 'Thạch cà phê', price: 8000 },
-  { id: 3, name: 'Kem cheese', price: 12000 },
-  { id: 4, name: 'Thêm 1 shot espresso', price: 10000 },
-  // Topping thêm tạm của Búp, chưa có trong seed của Hùng
-  { id: 5, name: 'Trân châu trắng', price: 5000 },
-  { id: 6, name: 'Pudding', price: 10000 },
-  { id: 7, name: 'Thạch trái cây', price: 8000 },
-  { id: 8, name: 'Bánh flan', price: 12000 },
-  { id: 9, name: 'Thạch phô mai', price: 12000 },
-];
 
 function formatVnd(amount: number) {
   return amount.toLocaleString('vi-VN') + 'đ';
@@ -96,18 +47,6 @@ class NotFoundError extends Error {}
 type Status = 'loading' | 'ready' | 'notfound' | 'error';
 
 async function fetchProduct(id: string): Promise<ProductDetail> {
-  if (USE_MOCK) {
-    await new Promise((r) => setTimeout(r, 400)); // giả lập độ trễ mạng
-    const base = MOCK_BASE[Number(id)];
-    if (!base) throw new NotFoundError();
-    return {
-      id: Number(id),
-      ...base,
-      imageUrl: imageOf(Number(id)),
-      sizes: MOCK_SIZES,
-      toppings: MOCK_TOPPINGS,
-    };
-  }
   const res = await fetch(`${API_URL}/products/${id}`);
   if (res.status === 404) throw new NotFoundError();
   if (!res.ok) throw new Error('fetch-failed');
