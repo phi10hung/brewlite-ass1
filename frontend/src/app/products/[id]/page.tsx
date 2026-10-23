@@ -18,7 +18,7 @@ type ProductDetail = {
 };
 
 // true = dùng dữ liệu giả; đổi thành false khi API của Quang chạy được
-const USE_MOCK = true;
+const USE_MOCK = false;
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 const DRINK_IMAGES: Record<number, string> = {
