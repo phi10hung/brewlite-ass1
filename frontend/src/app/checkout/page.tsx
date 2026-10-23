@@ -1,0 +1,460 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+
+import { useCartStore } from "@/store/cart-store";
+
+type PaymentMethod = "WALLET" | "CARD";
+
+type OrderResponse = {
+  id: number;
+  code?: string;
+  status?: string;
+  subtotal?: number;
+  discount?: number;
+  total?: number;
+};
+
+type PromotionResponse = {
+  code: string;
+  discount: number;
+  total: number;
+};
+
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+
+function formatPrice(value: number) {
+  return `${value.toLocaleString("vi-VN")}đ`;
+}
+
+export default function CheckoutPage() {
+  const router = useRouter();
+
+  const items = useCartStore((state) => state.items);
+  const totalPrice = useCartStore((state) => state.totalPrice());
+  const clear = useCartStore((state) => state.clear);
+
+  const [method, setMethod] =
+    useState<PaymentMethod>("WALLET");
+
+  const [simulateFail, setSimulateFail] = useState(false);
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Promotion
+  const [promotionCode, setPromotionCode] = useState("");
+  const [appliedPromotionCode, setAppliedPromotionCode] =
+    useState("");
+  const [discount, setDiscount] = useState(0);
+  const [promotionLoading, setPromotionLoading] = useState(false);
+  const [promotionError, setPromotionError] =
+    useState<string | null>(null);
+
+  const finalTotal = Math.max(totalPrice - discount, 0);
+
+  async function applyPromotion() {
+    const code = promotionCode.trim().toUpperCase();
+
+    if (!code) {
+      setPromotionError("Vui lòng nhập mã giảm giá.");
+      return;
+    }
+
+    if (items.length === 0) {
+      setPromotionError("Giỏ hàng đang trống.");
+      return;
+    }
+
+    setPromotionLoading(true);
+    setPromotionError(null);
+
+    try {
+      const response = await fetch(
+        `${API_URL}/promotions/validate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            code,
+            subtotal: totalPrice,
+          }),
+        }
+      );
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(
+          data?.message ?? "Mã giảm giá không hợp lệ."
+        );
+      }
+
+      const result = data as PromotionResponse;
+
+      setAppliedPromotionCode(result.code ?? code);
+      setDiscount(result.discount ?? 0);
+      setPromotionCode(result.code ?? code);
+    } catch (err) {
+      setAppliedPromotionCode("");
+      setDiscount(0);
+
+      setPromotionError(
+        err instanceof Error
+          ? err.message
+          : "Không thể áp dụng mã giảm giá."
+      );
+    } finally {
+      setPromotionLoading(false);
+    }
+  }
+
+  async function handleCheckout() {
+    if (items.length === 0) {
+      router.push("/cart");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    // Một key cho lần bấm thanh toán này.
+    // Nếu bổ sung retry do network sau này, phải tái sử dụng key này.
+    const idempotencyKey = crypto.randomUUID();
+
+    try {
+      const orderResponse = await fetch(`${API_URL}/orders`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          items: items.map((item) => ({
+            productId: item.productId,
+            size: item.size,
+
+            // Store hiện tại của Linh đang lưu topping dạng string[].
+            // Backend thật có thể yêu cầu toppingIds,
+            // nên đoạn này sẽ nối lại sau khi types/API của nhóm merge.
+            toppings: item.toppings,
+
+            quantity: item.quantity,
+          })),
+
+          ...(appliedPromotionCode
+            ? {
+                promotionCode: appliedPromotionCode,
+              }
+            : {}),
+        }),
+      });
+
+      const orderData = await orderResponse
+        .json()
+        .catch(() => null);
+
+      if (!orderResponse.ok) {
+        throw new Error(
+          orderData?.message ?? "Không thể tạo đơn hàng."
+        );
+      }
+
+      const order = orderData as OrderResponse;
+
+      if (!order.id) {
+        throw new Error("API tạo đơn không trả về order id.");
+      }
+
+      const paymentResponse = await fetch(
+        `${API_URL}/payments`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": idempotencyKey,
+          },
+          body: JSON.stringify({
+            orderId: order.id,
+            method,
+            ...(simulateFail
+              ? {
+                  simulate: "fail",
+                }
+              : {}),
+          }),
+        }
+      );
+
+      const paymentData = await paymentResponse
+        .json()
+        .catch(() => null);
+
+      if (!paymentResponse.ok) {
+        throw new Error(
+          paymentData?.message ?? "Thanh toán thất bại."
+        );
+      }
+
+      clear();
+
+      router.push(`/orders/${order.id}`);
+    } catch (err) {
+      // CỐ Ý không clear giỏ khi có lỗi.
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Có lỗi xảy ra khi thanh toán."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (items.length === 0) {
+    return (
+      <main className="mx-auto max-w-3xl px-4 py-10">
+        <div className="rounded-2xl border border-neutral-700 bg-neutral-950 p-8 text-center">
+          <div className="mb-4 text-5xl">🛒</div>
+
+          <h1 className="text-2xl font-bold">
+            Không có sản phẩm để thanh toán
+          </h1>
+
+          <p className="mt-2 text-neutral-400">
+            Hãy thêm đồ uống vào giỏ hàng trước.
+          </p>
+
+          <Link
+            href="/cart"
+            className="mt-6 inline-block rounded-xl bg-amber-700 px-6 py-3 font-semibold text-white hover:bg-amber-600"
+          >
+            Quay lại giỏ hàng
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="mx-auto max-w-5xl px-4 py-10">
+      <Link
+        href="/cart"
+        className="text-sm text-amber-700 hover:underline"
+      >
+        ← Quay lại giỏ hàng
+      </Link>
+
+      <h1 className="mt-5 text-3xl font-bold">
+        Thanh toán
+      </h1>
+
+      <p className="mt-2 text-neutral-400">
+        Kiểm tra đơn hàng và chọn phương thức thanh toán.
+      </p>
+
+      <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_360px]">
+        {/* LEFT */}
+        <section className="space-y-6">
+          {/* ITEMS */}
+          <div className="rounded-2xl border border-neutral-700 p-5">
+            <h2 className="text-xl font-bold">
+              Đơn hàng của bạn
+            </h2>
+
+            <div className="mt-4 divide-y divide-neutral-800">
+              {items.map((item) => (
+                <div
+                  key={`${item.productId}-${item.size}-${item.toppings
+                    .slice()
+                    .sort()
+                    .join("-")}`}
+                  className="flex justify-between gap-4 py-4"
+                >
+                  <div>
+                    <h3 className="font-semibold">
+                      {item.name}
+                    </h3>
+
+                    <p className="mt-1 text-sm text-neutral-400">
+                      Size {item.size}
+                    </p>
+
+                    {item.toppings.length > 0 && (
+                      <p className="mt-1 text-sm text-neutral-400">
+                        {item.toppings.join(", ")}
+                      </p>
+                    )}
+
+                    <p className="mt-1 text-sm text-neutral-400">
+                      Số lượng: {item.quantity}
+                    </p>
+                  </div>
+
+                  <div className="text-right font-semibold">
+                    {formatPrice(
+                      item.unitPrice * item.quantity
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* PROMOTION */}
+          <div className="rounded-2xl border border-neutral-700 p-5">
+            <h2 className="text-xl font-bold">
+              Mã giảm giá
+            </h2>
+
+            <p className="mt-1 text-sm text-neutral-400">
+              Nhập mã khuyến mãi nếu bạn có.
+            </p>
+
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+              <input
+                type="text"
+                value={promotionCode}
+                onChange={(event) => {
+                  setPromotionCode(event.target.value);
+                  setPromotionError(null);
+                }}
+                placeholder="Ví dụ: GIAM10"
+                className="min-w-0 flex-1 rounded-xl border border-neutral-700 bg-transparent px-4 py-3 outline-none focus:border-amber-600"
+              />
+
+              <button
+                type="button"
+                disabled={promotionLoading || loading}
+                onClick={applyPromotion}
+                className="rounded-xl bg-neutral-800 px-5 py-3 font-semibold hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {promotionLoading
+                  ? "Đang kiểm tra..."
+                  : "Áp dụng"}
+              </button>
+            </div>
+
+            {promotionError && (
+              <p className="mt-3 text-sm text-red-500">
+                {promotionError}
+              </p>
+            )}
+
+            {appliedPromotionCode && discount > 0 && (
+              <p className="mt-3 text-sm font-medium text-green-500">
+                Đã áp dụng mã {appliedPromotionCode}: giảm{" "}
+                {formatPrice(discount)}
+              </p>
+            )}
+          </div>
+
+          {/* PAYMENT METHOD */}
+          <div className="rounded-2xl border border-neutral-700 p-5">
+            <h2 className="text-xl font-bold">
+              Phương thức thanh toán
+            </h2>
+
+            <div className="mt-4 space-y-3">
+              <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-neutral-700 p-4">
+                <input
+                  type="radio"
+                  name="paymentMethod"
+                  value="WALLET"
+                  checked={method === "WALLET"}
+                  onChange={() => setMethod("WALLET")}
+                />
+
+                <span>
+                  <strong>Ví điện tử</strong>
+                </span>
+              </label>
+
+              <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-neutral-700 p-4">
+                <input
+                  type="radio"
+                  name="paymentMethod"
+                  value="CARD"
+                  checked={method === "CARD"}
+                  onChange={() => setMethod("CARD")}
+                />
+
+                <span>
+                  <strong>Thẻ</strong>
+                </span>
+              </label>
+            </div>
+
+            <label className="mt-5 flex cursor-pointer items-center gap-3 text-sm text-neutral-400">
+              <input
+                type="checkbox"
+                checked={simulateFail}
+                onChange={(event) =>
+                  setSimulateFail(event.target.checked)
+                }
+              />
+
+              Giả lập thanh toán lỗi
+            </label>
+          </div>
+        </section>
+
+        {/* SUMMARY */}
+        <aside className="h-fit rounded-2xl border border-neutral-700 p-5 lg:sticky lg:top-6">
+          <h2 className="text-xl font-bold">
+            Tóm tắt thanh toán
+          </h2>
+
+          <div className="mt-5 space-y-3">
+            <div className="flex justify-between text-neutral-400">
+              <span>Tạm tính</span>
+              <span>{formatPrice(totalPrice)}</span>
+            </div>
+
+            <div className="flex justify-between text-neutral-400">
+              <span>Giảm giá</span>
+              <span>
+                -{formatPrice(discount)}
+              </span>
+            </div>
+
+            <div className="border-t border-neutral-700 pt-4">
+              <div className="flex items-center justify-between">
+                <strong>Tổng thanh toán</strong>
+
+                <strong className="text-xl text-amber-600">
+                  {formatPrice(finalTotal)}
+                </strong>
+              </div>
+            </div>
+          </div>
+
+          {error && (
+            <div className="mt-5 rounded-xl border border-red-900 bg-red-950/30 p-3 text-sm text-red-400">
+              {error}
+            </div>
+          )}
+
+          <button
+            type="button"
+            disabled={loading}
+            onClick={handleCheckout}
+            className="mt-6 w-full rounded-xl bg-amber-700 px-4 py-3 font-bold text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading
+              ? "Đang xử lý..."
+              : "Xác nhận thanh toán"}
+          </button>
+
+          <p className="mt-3 text-center text-xs text-neutral-500">
+            Không đóng trang trong lúc đang xử lý thanh toán.
+          </p>
+        </aside>
+      </div>
+    </main>
+  );
+}
