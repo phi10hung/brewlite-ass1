@@ -43,6 +43,11 @@
 |  |  | Bổ sung | Layout chung: Navbar, Footer (bản đầu) | Khoa | #4, PR #31 |
 | 3 | 23/10/2026 | Chỉnh sửa | Duyệt và merge PR #30, #26 vào develop | Hùng | PR #26, #30 |
 |  |  | Chỉnh sửa | Review PR #31: PR gộp cả đăng nhập, lịch sử đơn và sửa trang Menu/chi tiết gây conflict, yêu cầu tách lại chỉ giữ layout | Hùng | PR #31 |
+|  |  | Phân công | Làm lại PR #31 chỉ giữ layout (tách đăng nhập, lịch sử đơn sang nhánh riêng) | Khoa | #4 |
+|  |  | Chỉnh sửa | Làm lại PR #31: tách phần đăng nhập, lịch sử đơn sang nhánh feature/khoa-auth-orders, giữ trang của Búp, Navbar có badge số lượng giỏ hàng, User Story layout | Khoa | #4, PR #31 |
+|  |  | Chỉnh sửa | Duyệt và merge PR #31 vào develop | Hùng | PR #31 |
+|  |  | Phân công | Trang Menu, chi tiết chuyển sang dữ liệu thật từ API, nối nút Thêm vào giỏ | Búp | #5, #6, #8 |
+|  |  | Bổ sung | Trang Menu lấy danh sách món từ API GET /products, bỏ dữ liệu giả, cập nhật User Story | Búp | #5, PR #40 |
 
 ## Task 4 – Chi tiết và tùy chọn sản phẩm
 
@@ -54,6 +59,8 @@
 |  |  | Chỉnh sửa | Thêm ảnh đồ uống ở trang chi tiết theo góp ý | Búp | PR #27 |
 | 3 | 23/10/2026 | Chỉnh sửa | Bổ sung User Story trang chi tiết | Búp | PR #27 |
 |  |  | Chỉnh sửa | Duyệt và merge PR #27 vào develop | Hùng | PR #27 |
+|  |  | Bổ sung | Trang chi tiết lấy món, size, topping từ API GET /products/:id; nút Thêm vào giỏ thêm món vào giỏ hàng thật; cập nhật User Story | Búp | #6, #8, PR #40 |
+|  |  | Chỉnh sửa | Duyệt và merge PR #40 vào develop | Hùng | PR #40 |
 
 ## Task 5 – Giỏ hàng
 
@@ -62,12 +69,22 @@
 | 1 | 21/10/2026 | Phân công | Giỏ hàng Cart UI + Zustand state | Linh | #8 |
 | 2 | 22/10/2026 | Bổ sung | Store giỏ hàng Zustand (thêm, sửa số lượng, xoá, tính tổng, lưu khi tải lại) và trang giỏ hàng | Linh | #8, PR #28 |
 | 3 | 23/10/2026 | Chỉnh sửa | Duyệt PR #28, sửa tiêu đề và mô tả PR cho đúng quy ước, merge vào develop | Hùng | PR #28 |
+|  |  | Bổ sung | User Story giỏ hàng | Linh | #8, PR #36 |
+|  |  | Chỉnh sửa | Duyệt và merge PR #36 | Triệu | PR #36 |
+|  |  | Phân công | Store giỏ hàng lưu thêm toppingIds để gửi API tạo đơn | Linh | #8, #14 |
+|  |  | Bổ sung | Store giỏ hàng lưu toppingIds, Checkout gửi toppingIds theo định dạng API tạo đơn | Linh | PR #37 |
+|  |  | Chỉnh sửa | Review PR #37: trang giỏ hàng lỗi biên dịch (vẫn truyền tên topping), yêu cầu sửa | Hùng | PR #37 |
+|  |  | Chỉnh sửa | Sửa trang giỏ hàng dùng toppingIds, xoá giỏ cũ chưa có toppingIds | Linh | PR #37 |
+|  |  | Chỉnh sửa | Duyệt và merge PR #37 vào develop | Hùng | PR #37 |
 
 ## Task 6 – API tạo đơn hàng
 
 | STT | Thời gian | Loại | Nội dung | Thành viên | Link |
 |---|---|---|---|---|---|
 | 1 | 21/10/2026 | Phân công | API POST /orders (validate DTO, lưu PENDING) | Quang | #9 |
+| 2 | 23/10/2026 | Phân công | API POST /orders: tính giá ở backend, lưu đơn PENDING, yêu cầu đăng nhập | Quang | #9 |
+|  |  | Bổ sung | API POST /orders: DTO kiểm tra dữ liệu, tính giá ở backend, lưu Order + OrderItem trạng thái PENDING, sinh mã đơn, yêu cầu đăng nhập, unit test, User Story | Quang | #9, PR #39 |
+|  |  | Chỉnh sửa | Duyệt và merge PR #39 vào develop | Hùng | PR #39 |
 
 ## Task 7 – Đăng ký / Đăng nhập (JWT)
 
@@ -75,6 +92,10 @@
 |---|---|---|---|---|---|
 | 1 | 21/10/2026 | Phân công | API đăng ký/đăng nhập, bcrypt, JWT Guard | Hùng | #10 |
 |  |  | Phân công | Màn hình Đăng ký/Đăng nhập | Khoa | #11 |
+| 2 | 23/10/2026 | Bổ sung | API đăng ký, đăng nhập: băm mật khẩu bcrypt, trả JWT, JwtAuthGuard, GET /auth/me, ValidationPipe, unit test, User Story | Hùng | #10, PR #35 |
+|  |  | Chỉnh sửa | Review và merge PR #35 | Triệu | PR #35 |
+|  |  | Bổ sung | Màn hình đăng ký, đăng nhập gọi API /auth, lưu token, tự gửi token khi gọi API; Navbar nút Đăng nhập / Đăng xuất; User Story | Khoa | #11, PR #38 |
+|  |  | Chỉnh sửa | Duyệt và merge PR #38 vào develop | Hùng | PR #38 |
 
 ## Task 8 – Thanh toán không tiền mặt
 
@@ -83,6 +104,9 @@
 | 1 | 21/10/2026 | Phân công | Mock Payment Service, POST /payments | Triệu | #13 |
 |  |  | Phân công | Màn hình Checkout, chọn Ví/Thẻ | Linh | #14 |
 | 2 | 22/10/2026 | Bổ sung | Giao diện Checkout: chọn Ví/Thẻ, gửi Idempotency-Key, ô nhập mã giảm giá (chưa nối API) | Linh | #14, PR #28 |
+| 2 | 23/10/2026 | Phân công | Mock Payment, POST /payments chuyển đơn PAID/PAYMENT_FAILED qua assertTransition | Triệu | #13 |
+|  |  | Bổ sung | Mock Payment Service (Ví/Thẻ, giả lập lỗi), API POST /payments yêu cầu đăng nhập, chỉ thanh toán đơn của mình, chuyển đơn PAID/PAYMENT_FAILED qua assertTransition, cho thanh toán lại sau lỗi, unit test, User Story | Triệu | #13, PR #41 |
+|  |  | Chỉnh sửa | Duyệt và merge PR #41 vào develop | Hùng | PR #41 |
 
 ## Task 9 – Xác nhận, lịch sử đơn và bàn giao
 
@@ -105,6 +129,7 @@
 | 3 | 23/10/2026 | Chỉnh sửa | Duyệt và merge PR #29 vào develop | Hùng | PR #29 |
 |  |  | Bổ sung | User Story Order State Machine | Triệu | PR #33 |
 |  |  | Chỉnh sửa | Duyệt và merge PR #33 vào develop | Hùng | PR #33 |
+|  |  | Bổ sung | Thanh toán idempotent: lưu Idempotency-Key, cùng key trả lại kết quả cũ không tạo thanh toán mới, khác dữ liệu báo 409, xử lý 2 yêu cầu đồng thời; test (b), User Story Task 10b | Triệu | #19, PR #41 |
 
 ## Tài liệu – User Story và bảng tiến độ
 
@@ -113,3 +138,6 @@
 | 1 | 21/10/2026 | Phân công | Tổng hợp User Story và ghi bảng tiến độ các Sprint | Búp | #7, #12, #22 |
 |  |  | Phân công | Mỗi người viết User Story cho phần mình code | Cả nhóm |  |
 | 2 | 23/10/2026 | Phân công | Đổi người phụ trách: Hùng nhận tổng hợp User Story và cập nhật bảng tiến độ (thay Búp) | Hùng | #7 |
+|  |  | Bổ sung | Ghi bảng tiến độ 21/10–23/10, User Story Task 1 | Hùng | PR #34 |
+|  |  | Chỉnh sửa | Review và merge PR #34 | Quang | PR #34 |
+|  |  | Chỉnh sửa | Rà soát issue, PR: gán người phụ trách, Milestone theo Sprint (Sprint 2 = Task 5–7) | Hùng |  |
