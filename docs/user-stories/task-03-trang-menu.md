@@ -13,5 +13,6 @@
 - [x] Không có món nào thì báo "Chưa có món nào"; lỗi kết nối thì báo lỗi kèm nút "Thử lại"
 - [x] Xem tốt trên điện thoại (2 cột) và máy tính (3–4 cột)
 - [x] Bấm vào một món thì chuyển sang trang chi tiết món đó
+- [x] Dữ liệu món (tên, giá, hình, danh mục) lấy từ API `GET /products`
 
-**Ghi chú:** hiện dùng dữ liệu giả khớp với dữ liệu mẫu trong database (14 món, sau khi PR thêm món được merge). Khi API `GET /products` hoàn thành sẽ chuyển sang dữ liệu thật.
+**Ghi chú:** dữ liệu lấy từ API `GET /products` (14 món trong dữ liệu mẫu), hình lấy từ `imageUrl` do API trả về. Đã bỏ dữ liệu giả.
