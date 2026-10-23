@@ -87,7 +87,7 @@ export default function CartPage() {
                           updateQuantity(
                             item.productId,
                             item.size,
-                            item.toppings,
+                            item.toppingIds,
                             item.quantity - 1
                           )
                         }
@@ -105,7 +105,7 @@ export default function CartPage() {
                           updateQuantity(
                             item.productId,
                             item.size,
-                            item.toppings,
+                            item.toppingIds,
                             item.quantity + 1
                           )
                         }
@@ -121,7 +121,7 @@ export default function CartPage() {
                         removeItem(
                           item.productId,
                           item.size,
-                          item.toppings
+                          item.toppingIds
                         )
                       }
                       className="text-sm text-red-600 hover:underline"
