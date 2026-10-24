@@ -1,5 +1,5 @@
 import { Test } from '@nestjs/testing';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { OrdersService, generateOrderCode } from './orders.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -9,7 +9,7 @@ describe('OrdersService', () => {
   const prismaMock = {
     product: { findMany: jest.fn() },
     topping: { findMany: jest.fn() },
-    order: { create: jest.fn() },
+    order: { create: jest.fn(), findMany: jest.fn(), findFirst: jest.fn() },
   };
 
   beforeEach(async () => {
@@ -76,5 +76,37 @@ describe('OrdersService', () => {
 
   it('mã đơn có dạng BL-XXXXXX', () => {
     expect(generateOrderCode()).toMatch(/^BL-[A-Z2-9]{6}$/);
+  });
+
+    it('lấy đơn của chính mình, mới nhất trước', async () => {
+    prismaMock.order.findMany.mockResolvedValue([{ id: 2 }, { id: 1 }]);
+
+    const result = await service.findMine(7);
+
+    expect(result).toEqual([{ id: 2 }, { id: 1 }]);
+    expect(prismaMock.order.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: 7 },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      }),
+    );
+  });
+
+  it('xem chi tiết đơn của mình', async () => {
+    prismaMock.order.findFirst.mockResolvedValue({ id: 5, code: 'BL-ABC234' });
+
+    await expect(service.findOne(7, 5)).resolves.toEqual({
+      id: 5,
+      code: 'BL-ABC234',
+    });
+    expect(prismaMock.order.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 5, userId: 7 } }),
+    );
+  });
+
+  it('đơn của người khác hoặc không tồn tại thì 404', async () => {
+    prismaMock.order.findFirst.mockResolvedValue(null);
+
+    await expect(service.findOne(7, 999)).rejects.toThrow(NotFoundException);
   });
 });
