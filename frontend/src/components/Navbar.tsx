@@ -36,6 +36,18 @@ export default function Navbar() {
             Menu
           </Link>
 
+          {isClient && user && (
+            <Link href="/orders" className="hover:text-amber-700">
+              Lịch sử đơn
+            </Link>
+          )}
+
+          {isClient && user?.role === "STAFF" && (
+            <Link href="/staff" className="hover:text-amber-700">
+              Quản lý đơn
+            </Link>
+          )}
+
           <Link
             href="/cart"
             aria-label="Giỏ hàng"
