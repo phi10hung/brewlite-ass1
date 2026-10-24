@@ -279,9 +279,9 @@ export default function CheckoutPage() {
                       Size {item.size}
                     </p>
 
-                    {item.toppingIds.length > 0 && (
+                    {item.toppings.length > 0 && (
                       <p className="mt-1 text-sm text-neutral-400">
-                        {item.toppingIds.join(", ")}
+                        {item.toppings.join(", ")}
                       </p>
                     )}
 
