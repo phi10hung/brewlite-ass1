@@ -6,11 +6,16 @@ import { PrismaService } from '../prisma/prisma.service';
 describe('OrdersService', () => {
   let service: OrdersService;
 
-  const prismaMock = {
-    product: { findMany: jest.fn() },
-    topping: { findMany: jest.fn() },
-    order: { create: jest.fn(), findMany: jest.fn(), findFirst: jest.fn() },
-  };
+  const prismaMock: any = {
+  product: {
+    findMany: jest.fn(),
+    findUnique: jest.fn(),
+    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+  },
+  topping: { findMany: jest.fn() },
+  order: { create: jest.fn(), findMany: jest.fn(), findFirst: jest.fn() },
+  $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(prismaMock)),
+};
 
   beforeEach(async () => {
     jest.clearAllMocks();

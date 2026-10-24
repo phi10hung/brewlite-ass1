@@ -69,35 +69,66 @@ export class OrdersService {
     const subtotal = lines.reduce((sum, l) => sum + l.lineTotal, 0);
 
     // Tạo Order và OrderItem trong một lần ghi: nếu một món lỗi thì cả đơn bị huỷ
-    return this.prisma.order.create({
-      data: {
-        code: generateOrderCode(),
-        status: 'PENDING',
-        subtotal,
-        discount: 0,
-        total: subtotal,
-        userId,
-        items: { create: lines },
-      },
-      select: {
-        id: true,
-        code: true,
-        status: true,
-        subtotal: true,
-        discount: true,
-        total: true,
-        items: {
-          select: {
-            productId: true,
-            productName: true,
-            size: true,
-            toppings: true,
-            quantity: true,
-            unitPrice: true,
-            lineTotal: true,
+    
+    // Gộp số lượng theo món: giỏ có thể có cùng 1 món ở nhiều dòng (khác size/topping)
+    const needed = new Map<number, { name: string; qty: number }>();
+    for (const line of lines) {
+      const cur = needed.get(line.productId);
+      needed.set(line.productId, {
+        name: line.productName,
+        qty: (cur?.qty ?? 0) + line.quantity,
+      });
+    }
+
+    // Trừ kho và tạo đơn trong CÙNG một transaction:
+    // một món hết hàng thì toàn bộ (kể cả các món đã trừ) bị hoàn tác
+    return this.prisma.$transaction(async (tx) => {
+      for (const [productId, { name, qty }] of needed) {
+        const result = await tx.product.updateMany({
+          where: { id: productId, stock: { gte: qty } },
+          data: { stock: { decrement: qty } },
+        });
+        if (result.count === 0) {
+          const p = await tx.product.findUnique({
+            where: { id: productId },
+            select: { stock: true },
+          });
+          throw new BadRequestException(
+            `Món ${name} chỉ còn ${p?.stock ?? 0} ly`,
+          );
+        }
+      }
+
+      return tx.order.create({
+        data: {
+          code: generateOrderCode(),
+          status: 'PENDING',
+          subtotal,
+          discount: 0,
+          total: subtotal,
+          userId,
+          items: { create: lines },
+        },
+        select: {
+          id: true,
+          code: true,
+          status: true,
+          subtotal: true,
+          discount: true,
+          total: true,
+          items: {
+            select: {
+              productId: true,
+              productName: true,
+              size: true,
+              toppings: true,
+              quantity: true,
+              unitPrice: true,
+              lineTotal: true,
+            },
           },
         },
-      },
+      });
     });
   }
     findMine(userId: number) {
