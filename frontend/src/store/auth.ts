@@ -8,7 +8,7 @@ export interface User {
   email: string;
   name: string;
   role: "CUSTOMER" | "STAFF" | string;
-  points?: number;
+  loyaltyPoints?: number;
 }
 
 interface AuthState {
