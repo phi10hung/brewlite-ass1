@@ -8,7 +8,9 @@ import { apiFetch } from "@/lib/api";
 import { useCartStore } from "@/store/cart-store";
 import { useAuthStore } from "@/store/auth";
 
+
 type PaymentMethod = "WALLET" | "CARD";
+
 type PaymentResponse = {
   id: number;
   status: "SUCCESS" | "FAILED";
@@ -30,8 +32,7 @@ type PromotionResponse = {
   total: number;
 };
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+
 
 function formatPrice(value: number) {
   return `${value.toLocaleString("vi-VN")}đ`;
@@ -61,6 +62,7 @@ export default function CheckoutPage() {
 
   useEffect(() => {
   if (!hydrated) return;
+
   if (!token) {
     router.replace(
       `/login?next=${encodeURIComponent("/checkout")}`
@@ -107,14 +109,14 @@ export default function CheckoutPage() {
     try {
       const result = await apiFetch<PromotionResponse>(
   "/promotions/validate",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            code,
-            subtotal: totalPrice,
-          }),
-        }
-      );
+  {
+    method: "POST",
+    body: JSON.stringify({
+      code,
+      subtotal: totalPrice,
+    }),
+  }
+);
 
       setAppliedPromotionCode(result.code ?? code);
       setDiscount(result.discount ?? 0);
@@ -147,27 +149,29 @@ export default function CheckoutPage() {
     const idempotencyKey = crypto.randomUUID();
 
     try {
+      // Thanh toán lỗi trước đó → dùng lại đúng đơn cũ, KHÔNG tạo đơn mới
+      // (tránh đơn rác và trừ kho 2 lần)
       let orderId = pendingOrderId;
 
       if (orderId === null) {
         const order = await apiFetch<OrderResponse>("/orders", {
-        method: "POST",
-        body: JSON.stringify({
-          items: items.map((item) => ({
-            productId: item.productId,
-            size: item.size,
-            toppingIds: item.toppingIds,
-            quantity: item.quantity,
-          })),
-          ...(appliedPromotionCode
+          method: "POST",
+          body: JSON.stringify({
+            items: items.map((item) => ({
+              productId: item.productId,
+              size: item.size,
+              toppingIds: item.toppingIds,
+              quantity: item.quantity,
+            })),
+            ...(appliedPromotionCode
               ? { promotionCode: appliedPromotionCode }
-            : {}),
-        }),
-      });
+              : {}),
+          }),
+        });
 
         if (!order.id) {
           throw new Error("API tạo đơn không trả về order id.");
-      }
+        }
         orderId = order.id;
         setPendingOrderId(order.id);
       }
@@ -175,35 +179,35 @@ export default function CheckoutPage() {
       if (orderId === null) {
         throw new Error("Không xác định được mã đơn hàng.");
       }
-
+      
       const payment = await apiFetch<PaymentResponse>(
   "/payments",
-        {
-          method: "POST",
-          headers: {
-            "Idempotency-Key": idempotencyKey,
-          },
-          body: JSON.stringify({
+  {
+    method: "POST",
+    headers: {
+      "Idempotency-Key": idempotencyKey,
+    },
+    body: JSON.stringify({
       orderId: orderId,
-            method,
-            ...(simulateFail
-              ? {
-                  simulate: "fail",
-                }
-              : {}),
-          }),
-        }
-      );
+      method,
+      ...(simulateFail
+        ? {
+            simulate: "fail",
+          }
+        : {}),
+    }),
+  }
+);
 
 if (payment.status !== "SUCCESS") {
   throw new Error("Thanh toán thất bại. Hãy thử lại.");
-      }
+}
 
       // Thành công: quên đơn đang chờ, xoá giỏ, sang trang xác nhận
       setPendingOrderId(null);
       clear();
 
-      router.push(`/orders/${order.id}`);
+      router.push(`/orders/${orderId}`);
     } catch (err) {
       // CỐ Ý không clear giỏ khi có lỗi.
       setError(
@@ -409,6 +413,9 @@ if (payment.status !== "SUCCESS") {
           <h2 className="text-xl font-bold">
             Tóm tắt thanh toán
           </h2>
+          <p className="mt-2 text-sm text-neutral-400">
+             Điểm thưởng hiện có: {loyaltyPoints}
+           </p>
 
           <div className="mt-5 space-y-3">
             <div className="flex justify-between text-neutral-400">
