@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { SIZE_EXTRA } from '../common/pricing';
@@ -99,5 +99,60 @@ export class OrdersService {
         },
       },
     });
+  }
+    findMine(userId: number) {
+    return this.prisma.order.findMany({
+      where: { userId },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      select: {
+        id: true,
+        code: true,
+        status: true,
+        total: true,
+        createdAt: true,
+        items: {
+          orderBy: { id: 'asc' },
+          select: {
+            productName: true,
+            size: true,
+            toppings: true,
+            quantity: true,
+            lineTotal: true,
+          },
+        },
+      },
+    });
+  }
+
+  async findOne(userId: number, id: number) {
+    // Lọc luôn theo userId: đơn không tồn tại hoặc của người khác đều ra null
+    const order = await this.prisma.order.findFirst({
+      where: { id, userId },
+      select: {
+        id: true,
+        code: true,
+        status: true,
+        subtotal: true,
+        discount: true,
+        total: true,
+        promotionCode: true,
+        createdAt: true,
+        items: {
+          orderBy: { id: 'asc' },
+          select: {
+            productName: true,
+            size: true,
+            toppings: true,
+            quantity: true,
+            unitPrice: true,
+            lineTotal: true,
+          },
+        },
+      },
+    });
+    if (!order) {
+      throw new NotFoundException('Không tìm thấy đơn hàng');
+    }
+    return order;
   }
 }
