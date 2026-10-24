@@ -1,4 +1,5 @@
 services:
+  # Database PostgreSQL – dùng khi code hằng ngày: docker compose up -d
   db:
     image: postgres:16-alpine
     container_name: brewlite-db
@@ -16,6 +17,39 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  # Backend + Frontend – chỉ chạy khi bật profile "app" (demo / bàn giao):
+  #   docker compose --profile app up --build -d
+  backend:
+    profiles: ["app"]
+    build: ./backend
+    container_name: brewlite-backend
+    restart: unless-stopped
+    environment:
+      # Trong mạng Docker, backend gọi database bằng tên dịch vụ "db" (không phải localhost)
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
+      API_PORT: 4000
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1d}
+    ports:
+      - "4000:4000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    profiles: ["app"]
+    build:
+      context: ./frontend
+      args:
+        # Trình duyệt trên máy người dùng gọi API qua cổng 4000 của máy
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
+    container_name: brewlite-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
 
 volumes:
   pgdata:
