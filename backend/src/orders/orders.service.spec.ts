@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { OrdersService, generateOrderCode } from './orders.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { PromotionsService } from '../promotions/promotions.service';
 
 describe('OrdersService', () => {
   let service: OrdersService;
@@ -17,14 +18,20 @@ describe('OrdersService', () => {
   $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(prismaMock)),
 };
 
+  const promotionsMock = {
+    calculate: jest.fn(),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
+    promotionsMock.calculate.mockReset();
     prismaMock.product.findUnique.mockResolvedValue({ stock: 100, version: 0 });
     prismaMock.product.updateMany.mockResolvedValue({ count: 1 });
     const moduleRef = await Test.createTestingModule({
       providers: [
         OrdersService,
         { provide: PrismaService, useValue: prismaMock },
+        { provide: PromotionsService, useValue: promotionsMock },
       ],
     }).compile();
     service = moduleRef.get(OrdersService);
@@ -48,12 +55,64 @@ describe('OrdersService', () => {
       expect.objectContaining({
         data: expect.objectContaining({
           subtotal: 134000,
+          discount: 0,
           total: 134000,
+          promotionCode: null,
           status: 'PENDING',
           userId: 7,
         }),
       }),
     );
+  });
+
+  it('áp mã giảm giá: lưu discount, total và promotionCode', async () => {
+    prismaMock.product.findMany.mockResolvedValue([
+      { id: 1, name: 'Latte', price: 120000 },
+    ]);
+    prismaMock.topping.findMany.mockResolvedValue([]);
+    promotionsMock.calculate.mockResolvedValue({
+      code: 'GIAM10',
+      discount: 12000,
+      total: 108000,
+    });
+    prismaMock.order.create.mockResolvedValue({ id: 1 });
+
+    await service.create(7, {
+      items: [{ productId: 1, size: 'S', toppingIds: [], quantity: 1 }],
+      promotionCode: 'giam10',
+    });
+
+    expect(promotionsMock.calculate).toHaveBeenCalledWith('giam10', 120000);
+    expect(prismaMock.order.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          subtotal: 120000,
+          discount: 12000,
+          total: 108000,
+          promotionCode: 'GIAM10',
+        }),
+      }),
+    );
+  });
+
+  it('mã giảm giá sai: báo lỗi và không trừ kho, không tạo đơn', async () => {
+    prismaMock.product.findMany.mockResolvedValue([
+      { id: 1, name: 'Latte', price: 120000 },
+    ]);
+    prismaMock.topping.findMany.mockResolvedValue([]);
+    promotionsMock.calculate.mockRejectedValue(
+      new BadRequestException('Mã giảm giá không tồn tại'),
+    );
+
+    await expect(
+      service.create(7, {
+        items: [{ productId: 1, size: 'S', toppingIds: [], quantity: 1 }],
+        promotionCode: 'KHONGCO',
+      }),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(prismaMock.product.updateMany).not.toHaveBeenCalled();
+    expect(prismaMock.order.create).not.toHaveBeenCalled();
   });
 
   it('báo lỗi khi sản phẩm không tồn tại', async () => {
@@ -145,7 +204,10 @@ describe('OrdersService - đặt đồng thời (test c)', () => {
       $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(fake)),
     };
 
-    const service = new OrdersService(fake);
+    const service = new OrdersService(
+      fake,
+      { calculate: jest.fn() } as unknown as PromotionsService,
+    );
     const dto = {
       items: [{ productId: 1, size: 'S', toppingIds: [], quantity: 1 }],
     };

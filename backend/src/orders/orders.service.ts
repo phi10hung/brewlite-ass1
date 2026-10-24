@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { SIZE_EXTRA } from '../common/pricing';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { PromotionsService } from '../promotions/promotions.service';
 
 // Bỏ các ký tự dễ nhầm (0/O, 1/I) để khách đọc mã đơn không bị sai
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -22,7 +23,10 @@ const MAX_ATTEMPTS = 3;
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly promotions: PromotionsService,
+  ) {}
 
   async create(userId: number, dto: CreateOrderDto) {
     const productIds = [...new Set(dto.items.map((i) => i.productId))];
@@ -73,6 +77,13 @@ export class OrdersService {
 
     const subtotal = lines.reduce((sum, l) => sum + l.lineTotal, 0);
 
+    // Mã sai phải báo lỗi trước khi trừ kho hoặc tạo đơn.
+    const promotion = dto.promotionCode
+      ? await this.promotions.calculate(dto.promotionCode, subtotal)
+      : null;
+    const discount = promotion?.discount ?? 0;
+    const total = subtotal - discount;
+
     // Tạo Order và OrderItem trong một lần ghi: nếu một món lỗi thì cả đơn bị huỷ
     
     // Gộp số lượng theo món: giỏ có thể có cùng 1 món ở nhiều dòng (khác size/topping)
@@ -118,8 +129,9 @@ export class OrdersService {
               code: generateOrderCode(),
               status: 'PENDING',
               subtotal,
-              discount: 0,
-              total: subtotal,
+              discount,
+              total,
+              promotionCode: promotion?.code ?? null,
               userId,
               items: { create: lines },
             },
@@ -130,6 +142,7 @@ export class OrdersService {
               subtotal: true,
               discount: true,
               total: true,
+              promotionCode: true,
               items: {
                 select: {
                   productId: true,

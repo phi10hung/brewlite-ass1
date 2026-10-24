@@ -114,6 +114,17 @@ export class PaymentsService {
           );
         }
 
+        if (paymentStatus === PaymentStatus.SUCCESS) {
+          const points = Math.floor(order.total / 10000);
+          await tx.user.update({
+            where: { id: userId },
+            data: { loyaltyPoints: { increment: points } },
+          });
+          await tx.loyaltyTransaction.create({
+            data: { userId, orderId: order.id, points },
+          });
+        }
+
         return payment;
       });
     } catch (error) {
