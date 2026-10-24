@@ -36,6 +36,17 @@ export default function CheckoutPage() {
   const items = useCartStore((state) => state.items);
   const totalPrice = useCartStore((state) => state.totalPrice());
   const clear = useCartStore((state) => state.clear);
+  const [latestPoints, setLatestPoints] = useState<number | null>(null);
+  const loyaltyPoints = latestPoints ?? user?.loyaltyPoints ?? 0;
+
+  useEffect(() => {
+    if (!token) return;
+    apiFetch<{ loyaltyPoints: number }>("/auth/me")
+      .then((me) => setLatestPoints(me.loyaltyPoints))
+      .catch(() => {
+        // Lỗi thì giữ số điểm cũ, không chặn việc thanh toán
+      });
+  }, [token]);
 
   const [method, setMethod] =
     useState<PaymentMethod>("WALLET");
