@@ -19,6 +19,8 @@ describe('OrdersService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    prismaMock.product.findUnique.mockResolvedValue({ stock: 100, version: 0 });
+    prismaMock.product.updateMany.mockResolvedValue({ count: 1 });
     const moduleRef = await Test.createTestingModule({
       providers: [
         OrdersService,
@@ -27,7 +29,7 @@ describe('OrdersService', () => {
     }).compile();
     service = moduleRef.get(OrdersService);
   });
-
+  
   it('tính đúng tiền: Latte size L + Kem cheese x2 = 134.000đ', async () => {
     prismaMock.product.findMany.mockResolvedValue([
       { id: 1, name: 'Latte', price: 49000 },
