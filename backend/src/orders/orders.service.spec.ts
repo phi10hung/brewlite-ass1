@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { OrdersService, generateOrderCode } from './orders.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { PromotionsService } from '../promotions/promotions.service';
 
 describe('OrdersService', () => {
   let service: OrdersService;
@@ -17,14 +18,20 @@ describe('OrdersService', () => {
   $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(prismaMock)),
 };
 
+  const promotionsMock = {
+    calculate: jest.fn(),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
+    promotionsMock.calculate.mockReset();
     prismaMock.product.findUnique.mockResolvedValue({ stock: 100, version: 0 });
     prismaMock.product.updateMany.mockResolvedValue({ count: 1 });
     const moduleRef = await Test.createTestingModule({
       providers: [
         OrdersService,
         { provide: PrismaService, useValue: prismaMock },
+        { provide: PromotionsService, useValue: promotionsMock },
       ],
     }).compile();
     service = moduleRef.get(OrdersService);
@@ -145,7 +152,10 @@ describe('OrdersService - đặt đồng thời (test c)', () => {
       $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(fake)),
     };
 
-    const service = new OrdersService(fake);
+    const service = new OrdersService(
+      fake,
+      { calculate: jest.fn() } as unknown as PromotionsService,
+    );
     const dto = {
       items: [{ productId: 1, size: 'S', toppingIds: [], quantity: 1 }],
     };
