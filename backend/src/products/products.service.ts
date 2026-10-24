@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-const SIZE_EXTRA = { S: 0, M: 5000, L: 10000 } as const;
+import { SIZE_EXTRA } from '../common/pricing';
 
 const PRODUCT_SELECT = {
   id: true,

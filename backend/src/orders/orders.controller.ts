@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthUser } from '../auth/auth.types';
@@ -13,5 +13,19 @@ export class OrdersController {
   @UseGuards(JwtAuthGuard)
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateOrderDto) {
     return this.ordersService.create(user.userId, dto);
+  }
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  findMine(@CurrentUser() user: AuthUser) {
+    return this.ordersService.findMine(user.userId);
+  }
+
+  @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  findOne(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.ordersService.findOne(user.userId, id);
   }
 }
