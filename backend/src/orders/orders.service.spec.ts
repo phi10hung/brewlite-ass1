@@ -117,3 +117,53 @@ describe('OrdersService', () => {
     await expect(service.findOne(7, 999)).rejects.toThrow(NotFoundException);
   });
 });
+
+describe('OrdersService - đặt đồng thời (test c)', () => {
+  it('2 đơn cùng mua món còn 1 ly: chỉ 1 đơn thành công, kho không âm', async () => {
+    // Kho giả trong bộ nhớ: còn đúng 1 ly
+    const db = { stock: 1, version: 0 };
+
+    const fake: any = {
+      product: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue([{ id: 1, name: 'Latte', price: 49000 }]),
+        findUnique: jest.fn(async () => {
+          await Promise.resolve(); // nhường lượt để 2 đơn cùng đọc trước khi ai ghi
+          return { stock: db.stock, version: db.version };
+        }),
+        // Giả lập database: chỉ khớp khi version trùng, rồi trừ kho + tăng version
+        updateMany: jest.fn(async ({ where, data }) => {
+          if (where.version !== db.version) return { count: 0 };
+          db.stock -= data.stock.decrement;
+          db.version += data.version.increment;
+          return { count: 1 };
+        }),
+      },
+      topping: { findMany: jest.fn().mockResolvedValue([]) },
+      order: { create: jest.fn(async () => ({ id: 1 })) },
+      $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(fake)),
+    };
+
+    const service = new OrdersService(fake);
+    const dto = {
+      items: [{ productId: 1, size: 'S', toppingIds: [], quantity: 1 }],
+    };
+
+    const results = await Promise.allSettled([
+      service.create(1, dto as never),
+      service.create(2, dto as never),
+    ]);
+
+    const ok = results.filter((r) => r.status === 'fulfilled');
+    const failed = results.filter((r) => r.status === 'rejected');
+
+    expect(ok).toHaveLength(1);
+    expect(failed).toHaveLength(1);
+    expect((failed[0] as PromiseRejectedResult).reason).toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(db.stock).toBe(0); // không âm
+    expect(fake.order.create).toHaveBeenCalledTimes(1); // chỉ tạo 1 đơn
+  });
+});
