@@ -49,7 +49,7 @@ async function main() {
   await prisma.product.createMany({
     data: products.map(({ slug, ...p }) => ({
       ...p,
-      imageUrl: `/images/drinks/${slug}.svg`,
+      imageUrl: `/images/drinks/${slug}.png`,
       stock: 50,
     })),
   });
