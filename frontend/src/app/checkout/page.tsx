@@ -7,6 +7,11 @@ import { useState } from "react";
 import { useCartStore } from "@/store/cart-store";
 
 type PaymentMethod = "WALLET" | "CARD";
+type PaymentResponse = {
+  id: number;
+  status: "SUCCESS" | "FAILED";
+  amount: number;
+};
 
 type OrderResponse = {
   id: number;
@@ -55,6 +60,7 @@ export default function CheckoutPage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingOrderId, setPendingOrderId] = useState<number | null>(null);
 
   // Promotion
   const [promotionCode, setPromotionCode] = useState("");
@@ -126,11 +132,11 @@ export default function CheckoutPage() {
     const idempotencyKey = crypto.randomUUID();
 
     try {
-      const orderResponse = await fetch(`${API_URL}/orders`, {
+      let orderId = pendingOrderId;
+
+      if (orderId === null) {
+        const order = await apiFetch<OrderResponse>("/orders", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({
           items: items.map((item) => ({
             productId: item.productId,
@@ -138,41 +144,32 @@ export default function CheckoutPage() {
             toppingIds: item.toppingIds,
             quantity: item.quantity,
           })),
-
           ...(appliedPromotionCode
-            ? {
-                promotionCode: appliedPromotionCode,
-              }
+              ? { promotionCode: appliedPromotionCode }
             : {}),
         }),
       });
 
-      const orderData = await orderResponse
-        .json()
-        .catch(() => null);
-
-      if (!orderResponse.ok) {
-        throw new Error(
-          orderData?.message ?? "Không thể tạo đơn hàng."
-        );
+        if (!order.id) {
+          throw new Error("API tạo đơn không trả về order id.");
+      }
+        orderId = order.id;
+        setPendingOrderId(order.id);
       }
 
-      const order = orderData as OrderResponse;
-
-      if (!order.id) {
-        throw new Error("API tạo đơn không trả về order id.");
+      if (orderId === null) {
+        throw new Error("Không xác định được mã đơn hàng.");
       }
 
-      const paymentResponse = await fetch(
-        `${API_URL}/payments`,
+      const payment = await apiFetch<PaymentResponse>(
+  "/payments",
         {
           method: "POST",
           headers: {
-            "Content-Type": "application/json",
             "Idempotency-Key": idempotencyKey,
           },
           body: JSON.stringify({
-            orderId: order.id,
+      orderId: orderId,
             method,
             ...(simulateFail
               ? {
@@ -183,16 +180,12 @@ export default function CheckoutPage() {
         }
       );
 
-      const paymentData = await paymentResponse
-        .json()
-        .catch(() => null);
-
-      if (!paymentResponse.ok) {
-        throw new Error(
-          paymentData?.message ?? "Thanh toán thất bại."
-        );
+if (payment.status !== "SUCCESS") {
+  throw new Error("Thanh toán thất bại. Hãy thử lại.");
       }
 
+      // Thành công: quên đơn đang chờ, xoá giỏ, sang trang xác nhận
+      setPendingOrderId(null);
       clear();
 
       router.push(`/orders/${order.id}`);
