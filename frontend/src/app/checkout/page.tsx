@@ -84,29 +84,16 @@ export default function CheckoutPage() {
     setPromotionError(null);
 
     try {
-      const response = await fetch(
-        `${API_URL}/promotions/validate`,
+      const result = await apiFetch<PromotionResponse>(
+  "/promotions/validate",
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify({
             code,
             subtotal: totalPrice,
           }),
         }
       );
-
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        throw new Error(
-          data?.message ?? "Mã giảm giá không hợp lệ."
-        );
-      }
-
-      const result = data as PromotionResponse;
 
       setAppliedPromotionCode(result.code ?? code);
       setDiscount(result.discount ?? 0);
@@ -337,7 +324,7 @@ export default function CheckoutPage() {
                 type="button"
                 disabled={promotionLoading || loading}
                 onClick={applyPromotion}
-                className="rounded-xl bg-neutral-800 px-5 py-3 font-semibold hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-xl bg-amber-800 px-5 py-3 font-semibold text-white hover:bg-amber-900 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {promotionLoading
                   ? "Đang kiểm tra..."
