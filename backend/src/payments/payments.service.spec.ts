@@ -71,11 +71,12 @@ describe('PaymentsService', () => {
 
   function mockOrder(
     status: 'PENDING' | 'PAYMENT_FAILED' | 'PAID' = 'PENDING',
+    total = 50000,
   ) {
     prismaMock.order.findFirst.mockResolvedValue({
       id: 10,
       status,
-      total: 50000,
+      total,
     });
   }
 
@@ -104,7 +105,34 @@ describe('PaymentsService', () => {
       where: { id: 10, status: 'PENDING' },
       data: { status: 'PAID' },
     });
+    expect(prismaMock.user.update).toHaveBeenCalledWith({
+      where: { id: 7 },
+      data: { loyaltyPoints: { increment: 5 } },
+    });
+    expect(prismaMock.loyaltyTransaction.create).toHaveBeenCalledWith({
+      data: { userId: 7, orderId: 10, points: 5 },
+    });
     expect(result).toEqual(payment());
+  });
+
+  it('cộng điểm theo total: 29.999đ được 2 điểm', async () => {
+    mockOrder('PENDING', 29999);
+    prismaMock.payment.findUnique.mockResolvedValue(null);
+    prismaMock.payment.create.mockResolvedValue(payment({ amount: 29999 }));
+    prismaMock.order.updateMany.mockResolvedValue({ count: 1 });
+
+    await service.create(7, 'key-points', {
+      orderId: 10,
+      method: 'WALLET',
+    });
+
+    expect(prismaMock.user.update).toHaveBeenCalledWith({
+      where: { id: 7 },
+      data: { loyaltyPoints: { increment: 2 } },
+    });
+    expect(prismaMock.loyaltyTransaction.create).toHaveBeenCalledWith({
+      data: { userId: 7, orderId: 10, points: 2 },
+    });
   });
 
   it('giả lập lỗi: lưu FAILED và chuyển PENDING -> PAYMENT_FAILED', async () => {
@@ -131,6 +159,8 @@ describe('PaymentsService', () => {
       where: { id: 10, status: 'PENDING' },
       data: { status: 'PAYMENT_FAILED' },
     });
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+    expect(prismaMock.loyaltyTransaction.create).not.toHaveBeenCalled();
   });
 
   it('cùng key trả lại Payment cũ, không tạo hoặc cập nhật thêm', async () => {
@@ -146,6 +176,8 @@ describe('PaymentsService', () => {
     expect(result).toEqual(existing);
     expect(prismaMock.payment.create).not.toHaveBeenCalled();
     expect(prismaMock.order.updateMany).not.toHaveBeenCalled();
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+    expect(prismaMock.loyaltyTransaction.create).not.toHaveBeenCalled();
   });
 
   it('cùng key nhưng khác phương thức: báo Conflict', async () => {
@@ -211,6 +243,13 @@ describe('PaymentsService', () => {
       where: { id: 10, status: 'PENDING' },
       data: { status: 'PAID' },
     });
+    expect(prismaMock.user.update).toHaveBeenCalledWith({
+      where: { id: 7 },
+      data: { loyaltyPoints: { increment: 5 } },
+    });
+    expect(prismaMock.loyaltyTransaction.create).toHaveBeenCalledWith({
+      data: { userId: 7, orderId: 10, points: 5 },
+    });
   });
 
   it('đơn PAYMENT_FAILED thử lại và vẫn lỗi: PAYMENT_FAILED -> PENDING -> PAYMENT_FAILED', async () => {
@@ -275,5 +314,7 @@ describe('PaymentsService', () => {
     await expect(
       service.create(7, 'key-success', { orderId: 10, method: 'WALLET' }),
     ).rejects.toThrow(ConflictException);
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+    expect(prismaMock.loyaltyTransaction.create).not.toHaveBeenCalled();
   });
 });
