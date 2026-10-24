@@ -27,6 +27,12 @@ const prismaMock = {
     findUnique: jest.fn(),
     create: jest.fn(),
   },
+  user: {
+    update: jest.fn(),
+  },
+  loyaltyTransaction: {
+    create: jest.fn(),
+  },
   $transaction: jest.fn(),
 };
 
@@ -50,6 +56,8 @@ describe('PaymentsService', () => {
     prismaMock.$transaction.mockImplementation(
       (callback: (tx: typeof prismaMock) => unknown) => callback(prismaMock),
     );
+    prismaMock.user.update.mockResolvedValue({});
+    prismaMock.loyaltyTransaction.create.mockResolvedValue({});
 
     const moduleRef = await Test.createTestingModule({
       providers: [
