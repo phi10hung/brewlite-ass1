@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
+import { apiFetch } from "@/lib/api";
 import { useCartStore } from "@/store/cart-store";
+import { useAuthStore } from "@/store/auth";
 
 type PaymentMethod = "WALLET" | "CARD";
 type PaymentResponse = {
@@ -41,6 +43,10 @@ export default function CheckoutPage() {
   const items = useCartStore((state) => state.items);
   const totalPrice = useCartStore((state) => state.totalPrice());
   const clear = useCartStore((state) => state.clear);
+  const token = useAuthStore((state) => state.token);
+  const hydrated = useAuthStore((state) => state.hydrated);
+  const user = useAuthStore((state) => state.user);
+  // Điểm thưởng: lấy số mới nhất từ GET /auth/me (số lúc đăng nhập có thể đã cũ)
   const [latestPoints, setLatestPoints] = useState<number | null>(null);
   const loyaltyPoints = latestPoints ?? user?.loyaltyPoints ?? 0;
 
@@ -52,6 +58,15 @@ export default function CheckoutPage() {
         // Lỗi thì giữ số điểm cũ, không chặn việc thanh toán
       });
   }, [token]);
+
+  useEffect(() => {
+  if (!hydrated) return;
+  if (!token) {
+    router.replace(
+      `/login?next=${encodeURIComponent("/checkout")}`
+    );
+  }
+}, [hydrated, token, router]);
 
   const [method, setMethod] =
     useState<PaymentMethod>("WALLET");
