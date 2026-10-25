@@ -48,6 +48,8 @@
 |  |  | Chỉnh sửa | Duyệt và merge PR #31 vào develop | Hùng | PR #31 |
 |  |  | Phân công | Trang Menu, chi tiết chuyển sang dữ liệu thật từ API, nối nút Thêm vào giỏ | Búp | #5, #6, #8 |
 |  |  | Bổ sung | Trang Menu lấy danh sách món từ API GET /products, bỏ dữ liệu giả, cập nhật User Story | Búp | #5, PR #40 |
+| 4 | 24/10/2026 | Chỉnh sửa | Thay 14 hình minh hoạ đồ uống bằng ảnh chụp (.png), dữ liệu mẫu dùng ảnh mới; đổi màu chung toàn trang: nền kem, chữ nâu, bỏ chế độ tối | Hùng | PR #50 |
+|  |  | Chỉnh sửa | Review và merge PR #50 | Khoa, Quang | PR #50 |
 
 ## Task 4 – Chi tiết và tùy chọn sản phẩm
 
@@ -108,6 +110,9 @@
 |  |  | Bổ sung | Mock Payment Service (Ví/Thẻ, giả lập lỗi), API POST /payments yêu cầu đăng nhập, chỉ thanh toán đơn của mình, chuyển đơn PAID/PAYMENT_FAILED qua assertTransition, cho thanh toán lại sau lỗi, unit test, User Story | Triệu | #13, PR #41 |
 |  |  | Chỉnh sửa | Duyệt và merge PR #41 vào develop | Hùng | PR #41 |
 |  |  | Phân công | Đợt 3: ráp hẳn Checkout (gửi token đăng nhập, chưa đăng nhập thì chuyển sang trang đăng nhập), sửa hiển thị tên topping | Linh | #14 |
+| 3 | 24/10/2026 | Bổ sung | Checkout gọi API kèm token, chưa đăng nhập thì chuyển sang trang đăng nhập; áp mã giảm giá qua POST /promotions/validate; hiển thị điểm thưởng; User Story (chưa tạo PR) | Linh | #14, #23 |
+|  |  | Chỉnh sửa | Chạy thử Checkout: phát hiện thanh toán lỗi rồi thử lại tạo đơn mới (trừ kho 2 lần), hiển thị mã topping thay vì tên, nút Áp dụng khó đọc, điểm thưởng không cập nhật; gửi hướng dẫn sửa và tách commit | Hùng | #14, #23 |
+|  |  | Phân công | Sửa 4 lỗi Checkout, tách commit theo từng phần và tạo PR | Linh | #14, #23 |
 
 ## Task 9 – Xác nhận, lịch sử đơn và bàn giao
 
@@ -119,6 +124,11 @@
 | 2 | 23/10/2026 | Phân công | Đợt 3: API GET /orders/me, GET /orders/:id (làm trước để Khoa dùng) | Quang | #15 |
 |  |  | Phân công | Đợt 3: màn hình xác nhận đơn và lịch sử đơn | Khoa | #16 |
 |  |  | Phân công | Đợt 3: Docker hoá frontend, backend, demo trọn luồng | Hùng | #17 |
+| 3 | 24/10/2026 | Bổ sung | API GET /orders/me (đơn của mình, mới nhất trước), GET /orders/:id (chặn xem đơn người khác), unit test, User Story; dùng chung SIZE_EXTRA | Quang | #15, PR #44 |
+|  |  | Chỉnh sửa | Duyệt và merge PR #44 vào develop | Hùng | PR #44 |
+|  |  | Bổ sung | Màn hình lịch sử đơn và xác nhận đơn (mã đơn, trạng thái, món, giảm giá, tổng), nhãn màu trạng thái, link Lịch sử đơn / Quản lý đơn trên Navbar, User Story | Khoa | #16, PR #49 |
+|  |  | Chỉnh sửa | Đóng PR #48 vì commit chưa đúng tài khoản tác giả; Khoa commit lại bằng tài khoản của mình ở PR #49 | Hùng, Khoa | PR #48, #49 |
+|  |  | Chỉnh sửa | Duyệt PR #49 (Hùng), merge vào develop (Quang) | Hùng, Quang | PR #49 |
 
 ## Task 10 – Nghiệp vụ backend nâng cao
 
@@ -138,6 +148,12 @@
 |  |  | Phân công | Đợt 3: khuyến mãi và điểm thưởng (backend) | Triệu | #21 |
 |  |  | Phân công | Đợt 3: giao diện mã giảm giá, điểm thưởng | Linh | #23 |
 |  |  | Phân công | Đợt 3: màn hình nhân viên cập nhật trạng thái đơn | Búp | #43 |
+| 4 | 24/10/2026 | Bổ sung | Kiểm soát tồn kho: trừ kho trong cùng transaction, optimistic locking bằng version, thử lại khi xung đột, báo hết hàng; test (c) đặt đồng thời không bán vượt kho | Quang | #20, PR #45 |
+|  |  | Chỉnh sửa | Thử 10–20 đơn đặt đồng thời, duyệt và merge PR #45 | Hùng | PR #45 |
+|  |  | Bổ sung | Màn hình nhân viên: StaffGuard, GET /staff/orders, PATCH /staff/orders/:id/status qua assertTransition, trang /staff, unit test, User Story | Búp | #43, PR #46 |
+|  |  | Chỉnh sửa | Duyệt PR #46 (Hùng, Triệu), merge vào develop (Triệu) | Hùng, Triệu | PR #46 |
+|  |  | Bổ sung | Khuyến mãi và điểm thưởng: POST /promotions/validate, áp mã khi tạo đơn, cộng điểm khi thanh toán thành công (mỗi đơn 1 lần), unit test, User Story | Triệu | #21, PR #47 |
+|  |  | Chỉnh sửa | Duyệt PR #47 (Hùng, Khoa), merge vào develop (Hùng) | Hùng, Khoa | PR #47 |
 
 ## Tài liệu – User Story và bảng tiến độ
 
@@ -149,3 +165,5 @@
 |  |  | Bổ sung | Ghi bảng tiến độ 21/10–23/10, User Story Task 1 | Hùng | PR #34 |
 |  |  | Chỉnh sửa | Review và merge PR #34 | Quang | PR #34 |
 |  |  | Chỉnh sửa | Rà soát issue, PR: gán người phụ trách, Milestone theo Sprint (Sprint 2 = Task 5–7) | Hùng |  |
+| 3 | 24/10/2026 | Phân công | Tạo issue #43 (màn hình nhân viên) và gửi file phân công đợt 3 cho từng thành viên | Hùng | #43 |
+|  |  | Chỉnh sửa | Review và merge PR #42 (tiến độ 23/10, phân công đợt 3) | Quang | PR #42 |
