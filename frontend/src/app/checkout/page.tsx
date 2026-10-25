@@ -2,11 +2,20 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
+import { apiFetch } from "@/lib/api";
 import { useCartStore } from "@/store/cart-store";
+import { useAuthStore } from "@/store/auth";
+
 
 type PaymentMethod = "WALLET" | "CARD";
+
+type PaymentResponse = {
+  id: number;
+  status: "SUCCESS" | "FAILED";
+  amount: number;
+};
 
 type OrderResponse = {
   id: number;
@@ -23,8 +32,7 @@ type PromotionResponse = {
   total: number;
 };
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+
 
 function formatPrice(value: number) {
   return `${value.toLocaleString("vi-VN")}đ`;
@@ -36,6 +44,31 @@ export default function CheckoutPage() {
   const items = useCartStore((state) => state.items);
   const totalPrice = useCartStore((state) => state.totalPrice());
   const clear = useCartStore((state) => state.clear);
+  const token = useAuthStore((state) => state.token);
+  const hydrated = useAuthStore((state) => state.hydrated);
+  const user = useAuthStore((state) => state.user);
+  // Điểm thưởng: lấy số mới nhất từ GET /auth/me (số lúc đăng nhập có thể đã cũ)
+  const [latestPoints, setLatestPoints] = useState<number | null>(null);
+  const loyaltyPoints = latestPoints ?? user?.loyaltyPoints ?? 0;
+
+  useEffect(() => {
+    if (!token) return;
+    apiFetch<{ loyaltyPoints: number }>("/auth/me")
+      .then((me) => setLatestPoints(me.loyaltyPoints))
+      .catch(() => {
+        // Lỗi thì giữ số điểm cũ, không chặn việc thanh toán
+      });
+  }, [token]);
+
+  useEffect(() => {
+  if (!hydrated) return;
+
+  if (!token) {
+    router.replace(
+      `/login?next=${encodeURIComponent("/checkout")}`
+    );
+  }
+}, [hydrated, token, router]);
 
   const [method, setMethod] =
     useState<PaymentMethod>("WALLET");
@@ -44,6 +77,7 @@ export default function CheckoutPage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingOrderId, setPendingOrderId] = useState<number | null>(null);
 
   // Promotion
   const [promotionCode, setPromotionCode] = useState("");
@@ -73,29 +107,16 @@ export default function CheckoutPage() {
     setPromotionError(null);
 
     try {
-      const response = await fetch(
-        `${API_URL}/promotions/validate`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            code,
-            subtotal: totalPrice,
-          }),
-        }
-      );
-
-      const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        throw new Error(
-          data?.message ?? "Mã giảm giá không hợp lệ."
-        );
-      }
-
-      const result = data as PromotionResponse;
+      const result = await apiFetch<PromotionResponse>(
+  "/promotions/validate",
+  {
+    method: "POST",
+    body: JSON.stringify({
+      code,
+      subtotal: totalPrice,
+    }),
+  }
+);
 
       setAppliedPromotionCode(result.code ?? code);
       setDiscount(result.discount ?? 0);
@@ -128,76 +149,65 @@ export default function CheckoutPage() {
     const idempotencyKey = crypto.randomUUID();
 
     try {
-      const orderResponse = await fetch(`${API_URL}/orders`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          items: items.map((item) => ({
-            productId: item.productId,
-            size: item.size,
-            toppingIds: item.toppingIds,
-            quantity: item.quantity,
-          })),
+      // Thanh toán lỗi trước đó → dùng lại đúng đơn cũ, KHÔNG tạo đơn mới
+      // (tránh đơn rác và trừ kho 2 lần)
+      let orderId = pendingOrderId;
 
-          ...(appliedPromotionCode
-            ? {
-                promotionCode: appliedPromotionCode,
-              }
-            : {}),
-        }),
-      });
-
-      const orderData = await orderResponse
-        .json()
-        .catch(() => null);
-
-      if (!orderResponse.ok) {
-        throw new Error(
-          orderData?.message ?? "Không thể tạo đơn hàng."
-        );
-      }
-
-      const order = orderData as OrderResponse;
-
-      if (!order.id) {
-        throw new Error("API tạo đơn không trả về order id.");
-      }
-
-      const paymentResponse = await fetch(
-        `${API_URL}/payments`,
-        {
+      if (orderId === null) {
+        const order = await apiFetch<OrderResponse>("/orders", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Idempotency-Key": idempotencyKey,
-          },
           body: JSON.stringify({
-            orderId: order.id,
-            method,
-            ...(simulateFail
-              ? {
-                  simulate: "fail",
-                }
+            items: items.map((item) => ({
+              productId: item.productId,
+              size: item.size,
+              toppingIds: item.toppingIds,
+              quantity: item.quantity,
+            })),
+            ...(appliedPromotionCode
+              ? { promotionCode: appliedPromotionCode }
               : {}),
           }),
+        });
+
+        if (!order.id) {
+          throw new Error("API tạo đơn không trả về order id.");
         }
-      );
-
-      const paymentData = await paymentResponse
-        .json()
-        .catch(() => null);
-
-      if (!paymentResponse.ok) {
-        throw new Error(
-          paymentData?.message ?? "Thanh toán thất bại."
-        );
+        orderId = order.id;
+        setPendingOrderId(order.id);
       }
 
+      if (orderId === null) {
+        throw new Error("Không xác định được mã đơn hàng.");
+      }
+      
+      const payment = await apiFetch<PaymentResponse>(
+  "/payments",
+  {
+    method: "POST",
+    headers: {
+      "Idempotency-Key": idempotencyKey,
+    },
+    body: JSON.stringify({
+      orderId: orderId,
+      method,
+      ...(simulateFail
+        ? {
+            simulate: "fail",
+          }
+        : {}),
+    }),
+  }
+);
+
+if (payment.status !== "SUCCESS") {
+  throw new Error("Thanh toán thất bại. Hãy thử lại.");
+}
+
+      // Thành công: quên đơn đang chờ, xoá giỏ, sang trang xác nhận
+      setPendingOrderId(null);
       clear();
 
-      router.push(`/orders/${order.id}`);
+      router.push(`/orders/${orderId}`);
     } catch (err) {
       // CỐ Ý không clear giỏ khi có lỗi.
       setError(
@@ -279,9 +289,9 @@ export default function CheckoutPage() {
                       Size {item.size}
                     </p>
 
-                    {item.toppingIds.length > 0 && (
+                    {item.toppings.length > 0 && (
                       <p className="mt-1 text-sm text-neutral-400">
-                        {item.toppingIds.join(", ")}
+                        {item.toppings.join(", ")}
                       </p>
                     )}
 
@@ -326,7 +336,7 @@ export default function CheckoutPage() {
                 type="button"
                 disabled={promotionLoading || loading}
                 onClick={applyPromotion}
-                className="rounded-xl bg-neutral-800 px-5 py-3 font-semibold hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-xl bg-amber-800 px-5 py-3 font-semibold text-white hover:bg-amber-900 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {promotionLoading
                   ? "Đang kiểm tra..."
@@ -403,6 +413,9 @@ export default function CheckoutPage() {
           <h2 className="text-xl font-bold">
             Tóm tắt thanh toán
           </h2>
+          <p className="mt-2 text-sm text-neutral-400">
+             Điểm thưởng hiện có: {loyaltyPoints}
+           </p>
 
           <div className="mt-5 space-y-3">
             <div className="flex justify-between text-neutral-400">
