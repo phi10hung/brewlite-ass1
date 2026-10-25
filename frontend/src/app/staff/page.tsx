@@ -42,7 +42,7 @@ const STATUS_LABEL: Record<OrderStatus, string> = {
 const NEXT_STEP: Partial<Record<OrderStatus, { status: OrderStatus; label: string }>> = {
   PAID: { status: 'PREPARING', label: 'Bắt đầu pha' },
   PREPARING: { status: 'READY', label: 'Đã xong' },
-  READY: { status: 'COMPLETED', label: 'Đã giao' },
+  READY: { status: 'COMPLETED', label: 'Hoàn thành đơn' },
 };
 
 const FILTERS: { value: string; label: string }[] = [
