@@ -39,7 +39,7 @@ npx prisma db seed
 npm run start:dev
 ```
 - `npx prisma migrate dev`: tạo các bảng trong database
-- `npx prisma db seed`: thêm dữ liệu mẫu (10 đồ uống, 4 topping, 2 mã giảm giá, 2 tài khoản test)
+- `npx prisma db seed`: thêm dữ liệu mẫu (14 đồ uống, 9 topping, 2 mã giảm giá, 2 tài khoản test)
 - Kiểm tra kết nối database: http://localhost:4000/health → `{"status":"ok","database":"up"}`
 - Xem dữ liệu trực quan: `npx prisma studio`
 
@@ -62,6 +62,22 @@ Mã giảm giá mẫu: `GIAM10` (giảm 10%, đơn từ 50.000đ), `BREW20K` (gi
 - `Can't reach database server`: chưa mở Docker Desktop hoặc chưa chạy `docker compose up -d`.
 - `Cannot find module '.../generated/prisma'`: chạy `npx prisma generate` trong thư mục `backend`.
 - Muốn làm mới dữ liệu mẫu: chạy lại `npx prisma db seed`.
+- `port is already allocated` khi chạy Docker: đang có backend/frontend chạy bằng `npm` (hoặc chương trình khác) dùng cổng 3000/4000 → tắt đi rồi chạy lại.
+
+## Chạy toàn bộ bằng Docker (demo / bàn giao)
+Không cần cài Node.js, chỉ cần **Docker Desktop**. Một lệnh bật cả database, backend và frontend:
+```
+copy .env.example .env
+docker compose --profile app up --build -d
+```
+- Lần đầu mất vài phút để tải và build. Khi xong mở **http://localhost:3000** (API ở http://localhost:4000).
+- Backend tự tạo bảng và tự nạp dữ liệu mẫu nếu database còn trống.
+- Xem log: `docker compose --profile app logs -f backend`
+- Tắt: `docker compose --profile app down` (thêm `-v` nếu muốn xoá luôn dữ liệu)
+- Nạp lại dữ liệu mẫu: `docker compose exec backend npx prisma db seed`
+- Sửa code xong muốn cập nhật: chạy lại `docker compose --profile app up --build -d`
+
+> Khi code hằng ngày vẫn dùng `docker compose up -d` (chỉ bật database) và chạy backend, frontend bằng `npm` như phần **Chạy local**. Không bật hai cách cùng lúc vì trùng cổng 3000, 4000.
 
 ## Thành viên và phân công
 | Thành viên | Vai trò | Task đảm nhận |
