@@ -2,8 +2,8 @@ import { BadRequestException } from '@nestjs/common';
 import { OrderStatus } from '../generated/prisma/enums';
 
 // Luồng chính: PENDING -> PAID -> PREPARING -> READY -> COMPLETED.
-// Ngoại lệ: PAYMENT_FAILED quay lại PENDING để thử lại; có thể hủy từ PENDING,
-// PAYMENT_FAILED, PREPARING, READY nhưng tuyệt đối không hủy từ PAID.
+// Ngoại lệ: PAYMENT_FAILED quay lại PENDING để thử lại; được hủy từ PENDING,
+// PAYMENT_FAILED, PAID (barista chưa nhận). Đã PREPARING, READY thì không hủy.
 const ORDER_TRANSITIONS: Readonly<Record<OrderStatus, readonly OrderStatus[]>> =
   {
     PENDING: [
@@ -12,9 +12,9 @@ const ORDER_TRANSITIONS: Readonly<Record<OrderStatus, readonly OrderStatus[]>> =
       OrderStatus.CANCELLED,
     ],
     PAYMENT_FAILED: [OrderStatus.PENDING, OrderStatus.CANCELLED],
-    PAID: [OrderStatus.PREPARING],
-    PREPARING: [OrderStatus.READY, OrderStatus.CANCELLED],
-    READY: [OrderStatus.COMPLETED, OrderStatus.CANCELLED],
+    PAID: [OrderStatus.PREPARING, OrderStatus.CANCELLED],
+    PREPARING: [OrderStatus.READY],
+    READY: [OrderStatus.COMPLETED],
     COMPLETED: [],
     CANCELLED: [],
   };
