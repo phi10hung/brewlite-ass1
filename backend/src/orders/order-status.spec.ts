@@ -13,10 +13,9 @@ const ALLOWED_TRANSITIONS: Transition[] = [
   [OrderStatus.PAYMENT_FAILED, OrderStatus.PENDING],
   [OrderStatus.PAYMENT_FAILED, OrderStatus.CANCELLED],
   [OrderStatus.PAID, OrderStatus.PREPARING],
+  [OrderStatus.PAID, OrderStatus.CANCELLED],
   [OrderStatus.PREPARING, OrderStatus.READY],
-  [OrderStatus.PREPARING, OrderStatus.CANCELLED],
   [OrderStatus.READY, OrderStatus.COMPLETED],
-  [OrderStatus.READY, OrderStatus.CANCELLED],
 ];
 
 const allowedKeys = new Set(
@@ -68,14 +67,15 @@ describe('OrderStatus transitions', () => {
       expect(() => assertTransition(from, to)).toThrow(BadRequestException);
     });
 
-    it('tuyệt đối không cho hủy đơn đã PAID', () => {
-      expect(canTransition(OrderStatus.PAID, OrderStatus.CANCELLED)).toBe(
-        false,
-      );
-      expect(() =>
-        assertTransition(OrderStatus.PAID, OrderStatus.CANCELLED),
-      ).toThrow(BadRequestException);
-    });
+    it.each([OrderStatus.PREPARING, OrderStatus.READY])(
+      'không cho hủy đơn đã bắt đầu pha (%s)',
+      (status) => {
+        expect(canTransition(status, OrderStatus.CANCELLED)).toBe(false);
+        expect(() => assertTransition(status, OrderStatus.CANCELLED)).toThrow(
+          BadRequestException,
+        );
+      },
+    );
 
     it.each([OrderStatus.COMPLETED, OrderStatus.CANCELLED])(
       'không cho chuyển tiếp từ trạng thái cuối %s',
