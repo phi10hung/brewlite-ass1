@@ -16,6 +16,7 @@ interface AuthState {
   user: User | null;
   hydrated: boolean;
   setSession: (token: string, user: User) => void;
+  setLoyaltyPoints: (points: number) => void;
   logout: () => void;
   setHydrated: (value: boolean) => void;
 }
@@ -28,6 +29,14 @@ export const useAuthStore = create<AuthState>()(
       hydrated: false,
 
       setSession: (token, user) => set({ token, user }),
+
+      // Cập nhật điểm thưởng mới nhất (lấy từ GET /auth/me)
+      setLoyaltyPoints: (points) =>
+        set((state) =>
+          state.user
+            ? { user: { ...state.user, loyaltyPoints: points } }
+            : {}
+        ),
 
       logout: () => set({ token: null, user: null }),
 
