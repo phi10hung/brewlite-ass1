@@ -129,6 +129,25 @@ export default function StaffPage() {
       .finally(() => setBusyId(null));
   };
 
+  // Hủy đơn: chỉ đơn Đã thanh toán (barista chưa bắt đầu pha), hỏi lại trước khi hủy
+  const cancelOrder = (order: StaffOrder) => {
+    const ok = window.confirm(
+      `Hủy đơn ${order.code}? Đơn đã thanh toán, nhớ hoàn tiền cho khách.`,
+    );
+    if (!ok) return;
+    setBusyId(order.id);
+    setActionError(null);
+    apiFetch(`/staff/orders/${order.id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'CANCELLED' }),
+    })
+      .then(() => reload())
+      .catch((e) => {
+        setActionError(e instanceof Error ? e.message : 'Không hủy được đơn');
+      })
+      .finally(() => setBusyId(null));
+  };
+
   if (forbidden) {
     return (
       <main className="mx-auto max-w-4xl p-4">
@@ -201,15 +220,26 @@ export default function StaffPage() {
 
                 <div className="mt-3 flex items-center justify-between">
                   <span className="font-semibold text-amber-700">{formatVnd(o.total)}</span>
-                  {next && (
-                    <button
-                      onClick={() => advance(o)}
-                      disabled={busyId === o.id}
-                      className="rounded bg-amber-700 px-4 py-2 text-white disabled:opacity-50"
-                    >
-                      {busyId === o.id ? 'Đang xử lý...' : next.label}
-                    </button>
-                  )}
+                                    <div className="flex gap-2">
+                    {o.status === 'PAID' && (
+                      <button
+                        onClick={() => cancelOrder(o)}
+                        disabled={busyId === o.id}
+                        className="rounded border border-red-600 px-4 py-2 text-red-600 hover:bg-red-50 disabled:opacity-50"
+                      >
+                        Hủy đơn
+                      </button>
+                    )}
+                    {next && (
+                      <button
+                        onClick={() => advance(o)}
+                        disabled={busyId === o.id}
+                        className="rounded bg-amber-700 px-4 py-2 text-white disabled:opacity-50"
+                      >
+                        {busyId === o.id ? 'Đang xử lý...' : next.label}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </li>
             );
