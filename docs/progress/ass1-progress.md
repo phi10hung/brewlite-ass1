@@ -63,6 +63,9 @@
 |  |  | Chỉnh sửa | Duyệt và merge PR #27 vào develop | Hùng | PR #27 |
 |  |  | Bổ sung | Trang chi tiết lấy món, size, topping từ API GET /products/:id; nút Thêm vào giỏ thêm món vào giỏ hàng thật; cập nhật User Story | Búp | #6, #8, PR #40 |
 |  |  | Chỉnh sửa | Duyệt và merge PR #40 vào develop | Hùng | PR #40 |
+| 4 | 25/10/2026 | Phân công | Sửa khung ảnh trang chi tiết bị bè ngang: khung vuông, căn giữa | Búp | #55 |
+|  |  | Chỉnh sửa | Khung ảnh trang chi tiết đổi sang khung vuông (aspect-square, max-w-md), căn giữa | Búp | #55, PR #60 |
+|  |  | Chỉnh sửa | Duyệt và merge PR #60 vào develop | Hùng | PR #60 |
 
 ## Task 5 – Giỏ hàng
 
@@ -106,13 +109,15 @@
 | 1 | 21/10/2026 | Phân công | Mock Payment Service, POST /payments | Triệu | #13 |
 |  |  | Phân công | Màn hình Checkout, chọn Ví/Thẻ | Linh | #14 |
 | 2 | 22/10/2026 | Bổ sung | Giao diện Checkout: chọn Ví/Thẻ, gửi Idempotency-Key, ô nhập mã giảm giá (chưa nối API) | Linh | #14, PR #28 |
-| 2 | 23/10/2026 | Phân công | Mock Payment, POST /payments chuyển đơn PAID/PAYMENT_FAILED qua assertTransition | Triệu | #13 |
+| 3 | 23/10/2026 | Phân công | Mock Payment, POST /payments chuyển đơn PAID/PAYMENT_FAILED qua assertTransition | Triệu | #13 |
 |  |  | Bổ sung | Mock Payment Service (Ví/Thẻ, giả lập lỗi), API POST /payments yêu cầu đăng nhập, chỉ thanh toán đơn của mình, chuyển đơn PAID/PAYMENT_FAILED qua assertTransition, cho thanh toán lại sau lỗi, unit test, User Story | Triệu | #13, PR #41 |
 |  |  | Chỉnh sửa | Duyệt và merge PR #41 vào develop | Hùng | PR #41 |
 |  |  | Phân công | Đợt 3: ráp hẳn Checkout (gửi token đăng nhập, chưa đăng nhập thì chuyển sang trang đăng nhập), sửa hiển thị tên topping | Linh | #14 |
-| 3 | 24/10/2026 | Bổ sung | Checkout gọi API kèm token, chưa đăng nhập thì chuyển sang trang đăng nhập; áp mã giảm giá qua POST /promotions/validate; hiển thị điểm thưởng; User Story (chưa tạo PR) | Linh | #14, #23 |
+| 4 | 24/10/2026 | Bổ sung | Checkout gọi API kèm token, chưa đăng nhập thì chuyển sang trang đăng nhập; áp mã giảm giá qua POST /promotions/validate; hiển thị điểm thưởng; User Story (chưa tạo PR) | Linh | #14, #23 |
 |  |  | Chỉnh sửa | Chạy thử Checkout: phát hiện thanh toán lỗi rồi thử lại tạo đơn mới (trừ kho 2 lần), hiển thị mã topping thay vì tên, nút Áp dụng khó đọc, điểm thưởng không cập nhật; gửi hướng dẫn sửa và tách commit | Hùng | #14, #23 |
 |  |  | Phân công | Sửa 4 lỗi Checkout, tách commit theo từng phần và tạo PR | Linh | #14, #23 |
+| 5 | 25/10/2026 | Chỉnh sửa | Checkout hoàn chỉnh: gọi API kèm token (chưa đăng nhập thì chuyển sang trang đăng nhập), áp mã giảm giá qua POST /promotions/validate, hiện tên topping thay vì mã số, hiện điểm thưởng mới nhất, thanh toán lỗi thì thanh toán lại đúng đơn cũ (không tạo đơn mới, không trừ kho 2 lần); User Story Checkout và mã giảm giá | Linh | #14, #23, PR #53 |
+|  |  | Chỉnh sửa | Chạy thử Checkout, duyệt và merge PR #53 vào develop | Hùng | PR #53 |
 
 ## Task 9 – Xác nhận, lịch sử đơn và bàn giao
 
@@ -129,6 +134,9 @@
 |  |  | Bổ sung | Màn hình lịch sử đơn và xác nhận đơn (mã đơn, trạng thái, món, giảm giá, tổng), nhãn màu trạng thái, link Lịch sử đơn / Quản lý đơn trên Navbar, User Story | Khoa | #16, PR #49 |
 |  |  | Chỉnh sửa | Đóng PR #48 vì commit chưa đúng tài khoản tác giả; Khoa commit lại bằng tài khoản của mình ở PR #49 | Hùng, Khoa | PR #48, #49 |
 |  |  | Chỉnh sửa | Duyệt PR #49 (Hùng), merge vào develop (Quang) | Hùng, Quang | PR #49 |
+| 4 | 25/10/2026 | Bổ sung | Docker hoá: Dockerfile backend (tự tạo bảng, nạp dữ liệu mẫu khi database trống), Dockerfile frontend, docker-compose chạy cả database, backend, frontend (profile app); Prisma sinh import đuôi .js để chạy được trong Docker; README hướng dẫn chạy toàn bộ bằng Docker | Hùng | #17, PR #52 |
+|  |  | Chỉnh sửa | Review và merge PR #52 | Quang | PR #52 |
+|  |  | Bổ sung | Chạy thử trên develop mới nhất: lint, 104 unit test, build backend và frontend đều đạt; bật toàn bộ bằng Docker, kiểm thử 54 trường hợp API theo luồng menu → đặt đơn → thanh toán lỗi/thanh toán lại → xác nhận → lịch sử → nhân viên đổi trạng thái, hủy đơn: đều đạt | Hùng | #17 |
 
 ## Task 10 – Nghiệp vụ backend nâng cao
 
@@ -154,6 +162,15 @@
 |  |  | Chỉnh sửa | Duyệt PR #46 (Hùng, Triệu), merge vào develop (Triệu) | Hùng, Triệu | PR #46 |
 |  |  | Bổ sung | Khuyến mãi và điểm thưởng: POST /promotions/validate, áp mã khi tạo đơn, cộng điểm khi thanh toán thành công (mỗi đơn 1 lần), unit test, User Story | Triệu | #21, PR #47 |
 |  |  | Chỉnh sửa | Duyệt PR #47 (Hùng, Khoa), merge vào develop (Hùng) | Hùng, Khoa | PR #47 |
+| 5 | 25/10/2026 | Chỉnh sửa | Đối chiếu sơ đồ trạng thái mục 9.1 của đề: luật hủy đơn chưa đúng (đang chặn hủy khi Đã thanh toán, cho hủy khi Đang pha, Sẵn sàng), tạo issue | Hùng | #54 |
+|  |  | Phân công | Sửa luật hủy đơn đúng sơ đồ mục 9.1 | Triệu | #54 |
+|  |  | Chỉnh sửa | Luật hủy đơn đúng sơ đồ: được hủy từ PENDING, PAYMENT_FAILED, PAID; chặn hủy khi PREPARING, READY; cập nhật test và User Story | Triệu | #54, PR #59 |
+|  |  | Chỉnh sửa | Duyệt và merge PR #59 vào develop | Hùng | PR #59 |
+|  |  | Phân công | Làm thêm: nút Hủy đơn ở trang nhân viên (làm sau khi #54 xong) | Búp | #56 |
+|  |  | Bổ sung | Nút Hủy đơn cho đơn Đã thanh toán ở trang nhân viên (hỏi xác nhận trước khi hủy), đổi chữ nút cuối thành "Hoàn thành đơn", cập nhật User Story | Búp | #56, PR #61 |
+|  |  | Chỉnh sửa | Duyệt và merge PR #61 vào develop | Hùng | PR #61 |
+|  |  | Bổ sung | Làm thêm: hiện điểm thưởng ⭐ của khách trên Navbar, tự cập nhật sau khi thanh toán | Hùng | #57, PR #58 |
+|  |  | Chỉnh sửa | Review PR #58 (Quang), merge vào develop (Hùng) | Quang, Hùng | PR #58 |
 
 ## Tài liệu – User Story và bảng tiến độ
 
@@ -167,3 +184,5 @@
 |  |  | Chỉnh sửa | Rà soát issue, PR: gán người phụ trách, Milestone theo Sprint (Sprint 2 = Task 5–7) | Hùng |  |
 | 3 | 24/10/2026 | Phân công | Tạo issue #43 (màn hình nhân viên) và gửi file phân công đợt 3 cho từng thành viên | Hùng | #43 |
 |  |  | Chỉnh sửa | Review và merge PR #42 (tiến độ 23/10, phân công đợt 3) | Quang | PR #42 |
+| 4 | 25/10/2026 | Chỉnh sửa | Review PR #51 (tiến độ 24/10) (Quang), merge vào develop (Búp) | Quang, Búp | PR #51 |
+|  |  | Bổ sung | Ghi bảng tiến độ ngày 25/10 | Hùng | #22 |
