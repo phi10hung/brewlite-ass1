@@ -164,9 +164,9 @@ function ProductDetail() {
       <div className="mt-3">
         {product.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={product.imageUrl} alt={product.name} className="aspect-video w-full rounded-lg object-cover" />
+          <img src={product.imageUrl} alt={product.name} className="mx-auto aspect-square w-full max-w-md rounded-lg object-cover" />
         ) : (
-          <div className="flex aspect-video w-full items-center justify-center rounded-lg bg-amber-50 text-7xl">
+          <div className="mx-auto flex aspect-square w-full max-w-md items-center justify-center rounded-lg bg-amber-50 text-7xl">
             {getIcon(product.name, product.category)}
           </div>
         )}
