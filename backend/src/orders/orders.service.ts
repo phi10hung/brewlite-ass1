@@ -19,7 +19,12 @@ export function generateOrderCode(): string {
 // Báo hiệu "version đã đổi, cần thử lại" (chỉ dùng nội bộ trong file này)
 class StockConflictError extends Error {}
 
-const MAX_ATTEMPTS = 3;
+// Số lần thử lại khi version đổi (nhiều đơn đặt cùng lúc)
+const MAX_ATTEMPTS = 10;
+
+// Chờ ngẫu nhiên trước khi thử lại để các đơn không đụng nhau ở vòng sau
+const waitBeforeRetry = (attempt: number) =>
+  new Promise((resolve) => setTimeout(resolve, Math.random() * 20 * attempt));
 
 @Injectable()
 export class OrdersService {
@@ -164,7 +169,8 @@ export class OrdersService {
             'Hệ thống đang bận, vui lòng đặt lại sau giây lát',
           );
         }
-        // còn lượt thử: vòng for chạy lại, đọc lại stock/version mới
+        // còn lượt thử: chờ ngẫu nhiên rồi vòng for chạy lại, đọc lại stock/version mới
+        await waitBeforeRetry(attempt);
       }
     }
   }
