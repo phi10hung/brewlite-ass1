@@ -19,6 +19,11 @@ type ProductDetail = {
 };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+// Backend chỉ nhận tối đa 20 ly mỗi dòng trong giỏ
+const MAX_QUANTITY = 20;
+
+const sameToppingIds = (a: number[], b: number[]) =>
+  [...a].sort((x, y) => x - y).join('|') === [...b].sort((x, y) => x - y).join('|');
 
 function formatVnd(amount: number) {
   return amount.toLocaleString('vi-VN') + 'đ';
@@ -65,6 +70,7 @@ function ProductDetail() {
   const [adding, setAdding] = useState(false);
   const [addMessage, setAddMessage] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
   const addItem = useCartStore((s) => s.addItem);
+  const cartItems = useCartStore((s) => s.items);
 
   useEffect(() => {
     let cancelled = false;
@@ -127,11 +133,30 @@ function ProductDetail() {
     .reduce((sum, t) => sum + t.price, 0);
   const unitPrice = product.price + sizeExtra + toppingsTotal;
   const total = unitPrice * quantity;
+    // Số ly món này (cùng size, cùng topping) đã có trong giỏ
+  const inCart =
+    cartItems.find(
+      (i) =>
+        i.productId === product.id &&
+        i.size === size &&
+        sameToppingIds(i.toppingIds, toppingIds)
+    )?.quantity ?? 0;
+  const remaining = MAX_QUANTITY - inCart;
 
   const toggleTopping = (tid: number) =>
     setToppingIds((prev) => (prev.includes(tid) ? prev.filter((x) => x !== tid) : [...prev, tid]));
 
   const handleAdd = async () => {
+    if (quantity > remaining) {
+      setAddMessage({
+        type: 'error',
+        text:
+          remaining <= 0
+            ? `Giỏ đã có ${MAX_QUANTITY} ly món này (cùng size, topping), không thêm được nữa`
+            : `Giỏ đã có ${inCart} ly món này, chỉ thêm được tối đa ${remaining} ly nữa`,
+      });
+      return;
+    }
     setAdding(true);
     setAddMessage(null);
     try {
@@ -218,10 +243,13 @@ function ProductDetail() {
           −
         </button>
         <span className="w-6 text-center">{quantity}</span>
-        <button onClick={() => setQuantity((q) => Math.min(20, q + 1))} className="h-8 w-8 rounded border">
+        <button onClick={() => setQuantity((q) => Math.min(MAX_QUANTITY, q + 1))} className="h-8 w-8 rounded border">
           +
         </button>
       </section>
+        {inCart > 0 && (
+        <p className="mt-2 text-sm text-stone-500">Trong giỏ đã có {inCart} ly (cùng size, topping)</p>
+      )}
 
       <p className="mt-6 text-xl font-semibold">
         Tổng: <span className="text-amber-700">{formatVnd(total)}</span>
