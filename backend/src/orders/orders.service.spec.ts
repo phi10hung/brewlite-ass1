@@ -1,5 +1,5 @@
 import { Test } from '@nestjs/testing';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { OrdersService, generateOrderCode } from './orders.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PromotionsService } from '../promotions/promotions.service';
@@ -227,5 +227,56 @@ describe('OrdersService - đặt đồng thời (test c)', () => {
     );
     expect(db.stock).toBe(0); // không âm
     expect(fake.order.create).toHaveBeenCalledTimes(1); // chỉ tạo 1 đơn
+  });
+});
+
+describe('OrdersService - thử lại khi xung đột version', () => {
+  function makeService(updateMany: jest.Mock) {
+    const fake: any = {
+      product: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue([{ id: 1, name: 'Latte', price: 49000 }]),
+        findUnique: jest.fn().mockResolvedValue({ stock: 100, version: 0 }),
+        updateMany,
+      },
+      topping: { findMany: jest.fn().mockResolvedValue([]) },
+      order: { create: jest.fn(async () => ({ id: 1 })) },
+      $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(fake)),
+    };
+    const service = new OrdersService(
+      fake,
+      { calculate: jest.fn() } as unknown as PromotionsService,
+    );
+    return { service, fake };
+  }
+  const dto = {
+    items: [{ productId: 1, size: 'S', toppingIds: [], quantity: 1 }],
+  };
+
+  it('xung đột 3 lần rồi thành công: vẫn tạo được đơn', async () => {
+    const updateMany = jest
+      .fn()
+      .mockResolvedValueOnce({ count: 0 })
+      .mockResolvedValueOnce({ count: 0 })
+      .mockResolvedValueOnce({ count: 0 })
+      .mockResolvedValue({ count: 1 });
+    const { service, fake } = makeService(updateMany);
+
+    await service.create(1, dto as never);
+
+    expect(updateMany).toHaveBeenCalledTimes(4);
+    expect(fake.order.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('xung đột mãi: báo 409 sau 10 lần thử', async () => {
+    const updateMany = jest.fn().mockResolvedValue({ count: 0 });
+    const { service, fake } = makeService(updateMany);
+
+    await expect(service.create(1, dto as never)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+    expect(updateMany).toHaveBeenCalledTimes(10);
+    expect(fake.order.create).not.toHaveBeenCalled();
   });
 });
