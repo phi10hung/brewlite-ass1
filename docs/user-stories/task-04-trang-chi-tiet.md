@@ -16,5 +16,6 @@
 - [x] Bấm "Thêm vào giỏ" thì món (kèm size, topping, số lượng, giá) được thêm vào giỏ hàng, hiện "Đã thêm vào giỏ hàng" và số trên thanh menu tăng
 - [x] Đang tải thì hiện thông báo; lỗi thì có nút "Thử lại"; món không tồn tại thì báo "Không tìm thấy món này"
 - [x] Dữ liệu món, size, topping lấy từ API `GET /products/:id`
+- [x] Không cho thêm vào giỏ nếu tổng số ly cùng món, cùng size, cùng topping vượt 20; báo còn thêm được bao nhiêu ly
 
 **Ghi chú:** nút "Thêm vào giỏ" gọi `addItem` của giỏ hàng (Task 5 của Linh). Đã bỏ dữ liệu giả.
