@@ -32,6 +32,9 @@ type CartState = {
   totalPrice: () => number;
 };
 
+// Backend chỉ nhận tối đa 20 ly mỗi dòng (create-order.dto.ts)
+export const MAX_QUANTITY = 20;
+
 const sameToppingIds = (a: number[], b: number[]) =>
   [...a].sort((x, y) => x - y).join("|") ===
   [...b].sort((x, y) => x - y).join("|");
@@ -54,13 +57,24 @@ export const useCartStore = create<CartState>()(
             return {
               items: state.items.map((current) =>
                 current === existing
-                  ? { ...current, quantity: current.quantity + item.quantity }
+                  ? {
+                      ...current,
+                      quantity: Math.min(
+                        current.quantity + item.quantity,
+                        MAX_QUANTITY
+                      ),
+                    }
                   : current
               ),
             };
           }
 
-          return { items: [...state.items, { ...item }] };
+          return {
+            items: [
+              ...state.items,
+              { ...item, quantity: Math.min(item.quantity, MAX_QUANTITY) },
+            ],
+          };
         }),
 
       updateQuantity: (productId, size, toppingIds, quantity) =>
@@ -79,7 +93,7 @@ export const useCartStore = create<CartState>()(
                   item.productId === productId &&
                   item.size === size &&
                   sameToppingIds(item.toppingIds, toppingIds)
-                    ? { ...item, quantity: Math.floor(quantity) }
+                    ? { ...item, quantity: Math.min(Math.floor(quantity), MAX_QUANTITY) }
                     : item
                 ),
         })),
