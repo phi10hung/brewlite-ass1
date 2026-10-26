@@ -15,3 +15,4 @@
 - [x] Giỏ trống thì hiện thông báo và nút quay lại menu
 - [ ] Bấm "Thêm vào giỏ" ở trang chi tiết (chờ nối với trang của Búp)
 - [ ] Badge số lượng trên Navbar (chờ layout của Khoa)
+- [x] Mỗi món tối đa 20 ly (khớp giới hạn của API): gộp món hoặc bấm "+" không vượt 20, nút "+" mờ khi đủ 20
