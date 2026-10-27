@@ -1,5 +1,7 @@
 # Task 10c: Kiểm soát tồn kho khi đặt đồng thời
 
+**Người viết:** Quang · **Issue:** #20 · **Sprint:** 3
+
 ## User Story
 
 Là chủ quán, tôi muốn hệ thống tự trừ tồn kho khi khách đặt đơn và không bao giờ bán vượt số ly còn lại, để tránh nhận đơn cho món đã hết hàng ngay cả khi nhiều khách đặt cùng lúc.
@@ -18,6 +20,3 @@ Là chủ quán, tôi muốn hệ thống tự trừ tồn kho khi khách đặt
 - Trừ kho bằng `updateMany` với điều kiện `version` khớp lúc đọc, đồng thời tăng `version` lên 1.
 - Các món được xử lý theo thứ tự `productId` tăng dần để tránh khóa chéo giữa các đơn.
 - Kiểm thử: unit test mô phỏng kho trong bộ nhớ, bắn 2 đơn song song bằng `Promise.allSettled` (test c).
-
-# ...
-   **Người viết:** Quang · **Issue:** #20 · **Sprint:** 3
