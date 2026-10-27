@@ -31,6 +31,12 @@ services:
       API_PORT: 4000
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1d}
+      VNP_TMN_CODE: ${VNP_TMN_CODE}
+      VNP_HASH_SECRET: ${VNP_HASH_SECRET}
+      VNP_PAY_URL: ${VNP_PAY_URL:-https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
+      VNP_API_URL: ${VNP_API_URL:-https://sandbox.vnpayment.vn/merchant_webapi/api/transaction}
+      VNP_RETURN_URL: ${VNP_RETURN_URL:-http://localhost:3000/payment/result}
+      ORDER_PAYMENT_MINUTES: ${ORDER_PAYMENT_MINUTES:-5}
     ports:
       - "4000:4000"
     depends_on:
