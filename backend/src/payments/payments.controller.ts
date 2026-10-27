@@ -1,9 +1,13 @@
 import {
   Body,
   Controller,
+  Get,
   Headers,
   Ip,
+  Param,
+  ParseIntPipe,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -12,6 +16,11 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PaymentStatus } from '../generated/prisma/enums';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { PaymentsService } from './payments.service';
+import type {
+  ApplyResult,
+  IpnResponse,
+  SyncResult,
+} from './payments.service';
 
 type PaymentResponse = {
   id: number;
@@ -45,5 +54,29 @@ export class PaymentsController {
       amount: payment.amount,
       payUrl: payment.payUrl,
     };
+  }
+
+  @Get('vnpay-return')
+  async vnpayReturn(
+    @Query() query: Record<string, unknown>,
+    @Ip() ipAddr: string,
+  ): Promise<ApplyResult> {
+    return this.paymentsService.handleReturn(query, ipAddr);
+  }
+
+  @Get('vnpay-ipn')
+  async vnpayIpn(
+    @Query() query: Record<string, unknown>,
+  ): Promise<IpnResponse> {
+    return this.paymentsService.handleIpn(query);
+  }
+
+  @Post(':orderId/sync')
+  @UseGuards(JwtAuthGuard)
+  async sync(
+    @CurrentUser() user: AuthUser,
+    @Param('orderId', ParseIntPipe) orderId: number,
+  ): Promise<SyncResult> {
+    return this.paymentsService.syncForUser(user.userId, orderId);
   }
 }

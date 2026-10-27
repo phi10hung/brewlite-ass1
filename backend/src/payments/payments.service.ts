@@ -2,14 +2,18 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomBytes } from 'node:crypto';
+import type { Prisma } from '../generated/prisma/client';
 import {
+  LoyaltyType,
   OrderStatus,
   PaymentMethod,
   PaymentStatus,
+  RefundStatus,
 } from '../generated/prisma/enums';
 import { assertTransition } from '../orders/order-status';
 import { PrismaService } from '../prisma/prisma.service';
@@ -26,6 +30,18 @@ const PAYMENT_SELECT = {
   createdAt: true,
 } as const;
 
+const PAYMENT_RESULT_SELECT = {
+  id: true,
+  orderId: true,
+  status: true,
+  amount: true,
+  txnRef: true,
+  transactionNo: true,
+  payDate: true,
+  refundStatus: true,
+  createdAt: true,
+} as const;
+
 type PaymentView = {
   id: number;
   orderId: number;
@@ -36,8 +52,66 @@ type PaymentView = {
   createdAt: Date;
 };
 
+type PaymentForResult = {
+  id: number;
+  orderId: number;
+  status: PaymentStatus;
+  amount: number;
+  txnRef: string | null;
+  createdAt: Date;
+};
+
+export type VnpayPaymentResult = {
+  responseCode: string;
+  transactionStatus: string;
+  transactionNo: string;
+  payDate: string;
+};
+
+export type ApplyResult = {
+  orderId: number;
+  orderStatus: OrderStatus;
+  success: boolean;
+};
+
+export type SyncResult = {
+  orderStatus: OrderStatus;
+};
+
+export type IpnResponse = {
+  RspCode: string;
+  Message: string;
+};
+
+type ApplyOutcome = ApplyResult & {
+  refundNeeded: boolean;
+};
+
 const TXN_REF_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const MAX_TXN_REF_ATTEMPTS = 3;
+const SYNC_INTERVAL_MS = 5_000;
+
+const IPN_RESPONSES = {
+  SUCCESS: { RspCode: '00', Message: 'Confirm Success' },
+  ORDER_NOT_FOUND: { RspCode: '01', Message: 'Order not found' },
+  ALREADY_CONFIRMED: { RspCode: '02', Message: 'Order already confirmed' },
+  INVALID_AMOUNT: { RspCode: '04', Message: 'Invalid amount' },
+  INVALID_SIGNATURE: { RspCode: '97', Message: 'Invalid signature' },
+  UNKNOWN_ERROR: { RspCode: '99', Message: 'Unknown error' },
+} as const satisfies Record<string, IpnResponse>;
+
+function readQueryString(
+  query: Record<string, unknown>,
+  key: string,
+): string | undefined {
+  const value = query[key];
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) {
+    const first = value.find((item) => typeof item === 'string');
+    return typeof first === 'string' ? first : undefined;
+  }
+  return undefined;
+}
 
 function isUniqueConstraintError(error: unknown): boolean {
   return (
@@ -78,6 +152,8 @@ function generateTxnRef(orderCode: string): string {
 
 @Injectable()
 export class PaymentsService {
+  private readonly logger = new Logger(PaymentsService.name);
+  private readonly lastSyncAt = new Map<number, number>();
   private readonly paymentMinutes: number;
 
   constructor(
@@ -222,6 +298,351 @@ export class PaymentsService {
     throw new ConflictException(
       'Không thể tạo mã giao dịch VNPay, vui lòng thử lại',
     );
+  }
+
+  async handleReturn(
+    query: Record<string, unknown>,
+    ipAddr?: string,
+  ): Promise<ApplyResult> {
+    if (!this.vnpay.verifyReturn(query)) {
+      throw new BadRequestException('Chữ ký VNPay không hợp lệ');
+    }
+
+    const txnRef = readQueryString(query, 'vnp_TxnRef')?.trim();
+    if (!txnRef) {
+      throw new BadRequestException('Thiếu mã giao dịch VNPay');
+    }
+
+    const payment = await this.prisma.payment.findUnique({
+      where: { txnRef },
+      select: PAYMENT_RESULT_SELECT,
+    });
+    if (!payment) {
+      throw new NotFoundException('Không tìm thấy thanh toán');
+    }
+
+    // Không tin kết quả trên Return URL; hỏi lại VNPay trước khi cập nhật đơn.
+    const result = await this.vnpay.queryTransaction({
+      txnRef,
+      transactionDate: payment.createdAt,
+      ipAddr,
+    });
+
+    return this.applyResult(payment, result);
+  }
+
+  async handleIpn(query: Record<string, unknown>): Promise<IpnResponse> {
+    if (!this.vnpay.verifyReturn(query)) {
+      return IPN_RESPONSES.INVALID_SIGNATURE;
+    }
+
+    const txnRef = readQueryString(query, 'vnp_TxnRef')?.trim();
+    if (!txnRef) {
+      return IPN_RESPONSES.ORDER_NOT_FOUND;
+    }
+
+    const payment = await this.prisma.payment.findUnique({
+      where: { txnRef },
+      select: PAYMENT_RESULT_SELECT,
+    });
+    if (!payment) {
+      return IPN_RESPONSES.ORDER_NOT_FOUND;
+    }
+
+    const amount = Number(readQueryString(query, 'vnp_Amount'));
+    if (!Number.isSafeInteger(amount) || amount !== payment.amount * 100) {
+      return IPN_RESPONSES.INVALID_AMOUNT;
+    }
+
+    if (payment.status !== PaymentStatus.PENDING) {
+      return IPN_RESPONSES.ALREADY_CONFIRMED;
+    }
+
+    const result: VnpayPaymentResult = {
+      responseCode: readQueryString(query, 'vnp_ResponseCode') ?? '',
+      transactionStatus:
+        readQueryString(query, 'vnp_TransactionStatus') ?? '',
+      transactionNo: readQueryString(query, 'vnp_TransactionNo') ?? '',
+      payDate: readQueryString(query, 'vnp_PayDate') ?? '',
+    };
+
+    try {
+      await this.applyResult(payment, result);
+    } catch (error) {
+      this.logger.warn(
+        `Xử lý IPN VNPay thất bại cho ${txnRef}: ${this.errorMessage(error)}`,
+      );
+      return IPN_RESPONSES.UNKNOWN_ERROR;
+    }
+
+    return IPN_RESPONSES.SUCCESS;
+  }
+
+  async syncForUser(userId: number, orderId: number): Promise<SyncResult> {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, userId },
+      select: { id: true },
+    });
+    if (!order) {
+      throw new NotFoundException('Không tìm thấy đơn hàng');
+    }
+
+    return this.syncOrder(orderId);
+  }
+
+  async syncOrder(orderId: number): Promise<SyncResult> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { id: true, status: true },
+    });
+    if (!order) {
+      throw new NotFoundException('Không tìm thấy đơn hàng');
+    }
+
+    const payment = await this.prisma.payment.findFirst({
+      where: {
+        orderId,
+        status: PaymentStatus.PENDING,
+        txnRef: { not: null },
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      select: PAYMENT_RESULT_SELECT,
+    });
+    const txnRef = payment?.txnRef;
+    if (!payment || !txnRef) {
+      return { orderStatus: order.status };
+    }
+
+    // VNPay giới hạn truy vấn trùng (mã 94): mỗi Payment chỉ hỏi tối đa 1 lần/5 giây.
+    const now = Date.now();
+    const lastQueriedAt = this.lastSyncAt.get(payment.id);
+    if (
+      lastQueriedAt !== undefined &&
+      now - lastQueriedAt < SYNC_INTERVAL_MS
+    ) {
+      return { orderStatus: await this.currentOrderStatus(orderId) };
+    }
+
+    this.lastSyncAt.set(payment.id, now);
+    try {
+      const result = await this.vnpay.queryTransaction({
+        txnRef,
+        transactionDate: payment.createdAt,
+      });
+      const applied = await this.applyResult(payment, result);
+      return { orderStatus: applied.orderStatus };
+    } catch (error) {
+      this.lastSyncAt.delete(payment.id);
+      throw error;
+    }
+  }
+
+  async applyResult(
+    payment: PaymentForResult,
+    result: VnpayPaymentResult,
+  ): Promise<ApplyResult> {
+    const success =
+      result.responseCode === '00' && result.transactionStatus === '00';
+
+    const outcome = await this.prisma.$transaction(
+      async (tx): Promise<ApplyOutcome> => {
+        const current = await tx.payment.findUnique({
+          where: { id: payment.id },
+          select: {
+            id: true,
+            orderId: true,
+            status: true,
+            amount: true,
+          },
+        });
+        if (!current) {
+          throw new NotFoundException('Không tìm thấy thanh toán');
+        }
+
+        const order = await tx.order.findUnique({
+          where: { id: current.orderId },
+          select: { id: true, status: true, userId: true },
+        });
+        if (!order) {
+          throw new NotFoundException('Không tìm thấy đơn hàng');
+        }
+
+        // Payment đã xử lý rồi: giữ nguyên Payment và đơn.
+        if (current.status !== PaymentStatus.PENDING) {
+          return {
+            orderId: order.id,
+            orderStatus: order.status,
+            success: current.status === PaymentStatus.SUCCESS,
+            refundNeeded: false,
+          };
+        }
+
+        if (success) {
+          const updatedPayment = await tx.payment.updateMany({
+            where: { id: current.id, status: PaymentStatus.PENDING },
+            data: {
+              status: PaymentStatus.SUCCESS,
+              transactionNo: result.transactionNo || null,
+              payDate: result.payDate || null,
+            },
+          });
+
+          if (updatedPayment.count === 0) {
+            return this.currentOutcome(tx, current.id, order.id, order.status);
+          }
+
+          // Chỉ một kết quả thắng được chuyển PENDING -> PAID và cộng điểm.
+          const paid = await tx.order.updateMany({
+            where: { id: order.id, status: OrderStatus.PENDING },
+            data: { status: OrderStatus.PAID },
+          });
+          if (paid.count === 1) {
+            await this.awardLoyaltyPoints(
+              tx,
+              order.id,
+              order.userId,
+              current.amount,
+            );
+            return {
+              orderId: order.id,
+              orderStatus: OrderStatus.PAID,
+              success: true,
+              refundNeeded: false,
+            };
+          }
+
+          const latestOrder = await tx.order.findUnique({
+            where: { id: order.id },
+            select: { status: true },
+          });
+          const orderStatus = latestOrder?.status ?? order.status;
+          return {
+            orderId: order.id,
+            orderStatus,
+            success: true,
+            refundNeeded: orderStatus === OrderStatus.CANCELLED,
+          };
+        }
+
+        const updatedPayment = await tx.payment.updateMany({
+          where: { id: current.id, status: PaymentStatus.PENDING },
+          data: { status: PaymentStatus.FAILED },
+        });
+        if (updatedPayment.count === 0) {
+          return this.currentOutcome(tx, current.id, order.id, order.status);
+        }
+
+        await tx.order.updateMany({
+          where: { id: order.id, status: OrderStatus.PENDING },
+          data: { status: OrderStatus.PAYMENT_FAILED },
+        });
+        const latestOrder = await tx.order.findUnique({
+          where: { id: order.id },
+          select: { status: true },
+        });
+
+        return {
+          orderId: order.id,
+          orderStatus: latestOrder?.status ?? order.status,
+          success: false,
+          refundNeeded: false,
+        };
+      },
+    );
+
+    if (outcome.refundNeeded) {
+      try {
+        await this.refundOrder(outcome.orderId);
+      } catch (error) {
+        this.logger.warn(
+          `Không thể hoàn tiền đơn ${outcome.orderId}: ${this.errorMessage(error)}`,
+        );
+      }
+    }
+
+    return {
+      orderId: outcome.orderId,
+      orderStatus: outcome.orderStatus,
+      success: outcome.success,
+    };
+  }
+
+  // Bước 4 sẽ gọi API hoàn tiền VNPay; hiện đánh dấu để không mất giao dịch.
+  async refundOrder(orderId: number): Promise<void> {
+    const updated = await this.prisma.payment.updateMany({
+      where: {
+        orderId,
+        status: PaymentStatus.SUCCESS,
+        refundStatus: null,
+      },
+      data: { refundStatus: RefundStatus.PENDING },
+    });
+
+    if (updated.count > 0) {
+      this.logger.warn(
+        `Đơn ${orderId} thanh toán sau khi hủy, đã đánh dấu chờ hoàn tiền`,
+      );
+    }
+  }
+
+  private async currentOutcome(
+    tx: Prisma.TransactionClient,
+    paymentId: number,
+    orderId: number,
+    fallbackStatus: OrderStatus,
+  ): Promise<ApplyOutcome> {
+    const latestPayment = await tx.payment.findUnique({
+      where: { id: paymentId },
+      select: { status: true },
+    });
+    const latestOrder = await tx.order.findUnique({
+      where: { id: orderId },
+      select: { status: true },
+    });
+
+    return {
+      orderId,
+      orderStatus: latestOrder?.status ?? fallbackStatus,
+      success: latestPayment?.status === PaymentStatus.SUCCESS,
+      refundNeeded: false,
+    };
+  }
+
+  private async awardLoyaltyPoints(
+    tx: Prisma.TransactionClient,
+    orderId: number,
+    userId: number,
+    amount: number,
+  ): Promise<void> {
+    const existing = await tx.loyaltyTransaction.findUnique({
+      where: { orderId_type: { orderId, type: LoyaltyType.EARN } },
+      select: { id: true },
+    });
+    if (existing) return;
+
+    const points = Math.floor(amount / 10_000);
+    await tx.user.update({
+      where: { id: userId },
+      data: { loyaltyPoints: { increment: points } },
+    });
+    await tx.loyaltyTransaction.create({
+      data: { userId, orderId, type: LoyaltyType.EARN, points },
+    });
+  }
+
+  private async currentOrderStatus(orderId: number): Promise<OrderStatus> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { status: true },
+    });
+    if (!order) {
+      throw new NotFoundException('Không tìm thấy đơn hàng');
+    }
+    return order.status;
+  }
+
+  private errorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
   }
 
   private findExistingPayment(key: string) {
