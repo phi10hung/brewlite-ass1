@@ -13,13 +13,14 @@ describe('PaymentsController', () => {
     email: 'customer@example.com',
     role: 'CUSTOMER',
   };
-  const createdAt = new Date('2026-10-23T00:00:00.000Z');
+  const createdAt = new Date('2026-10-27T00:00:00.000Z');
   const payment = {
     id: 1,
     orderId: 10,
     method: 'WALLET' as const,
-    status: 'SUCCESS' as const,
+    status: 'PENDING' as const,
     amount: 50000,
+    payUrl: 'https://vnpay.test/pay',
     createdAt,
   };
 
@@ -27,38 +28,27 @@ describe('PaymentsController', () => {
     createPayment.mockReset();
   });
 
-  it('trả body id/status/amount khi thanh toán thành công', async () => {
+  it('trả body id/status/amount/payUrl khi tạo link thanh toán', async () => {
     createPayment.mockResolvedValue(payment);
 
     await expect(
-      controller.create(user, 'key-success', {
-        orderId: 10,
-        method: 'WALLET',
-      }),
+      controller.create(
+        user,
+        'key-success',
+        { orderId: 10, method: 'WALLET' },
+        '127.0.0.1',
+      ),
     ).resolves.toEqual({
       id: 1,
-      status: 'SUCCESS',
+      status: 'PENDING',
       amount: 50000,
+      payUrl: 'https://vnpay.test/pay',
     });
-    expect(createPayment).toHaveBeenCalledWith(7, 'key-success', {
-      orderId: 10,
-      method: 'WALLET',
-    });
-  });
-
-  it('trả body FAILED thay vì ném lỗi khi giả lập thanh toán lỗi', async () => {
-    createPayment.mockResolvedValue({ ...payment, status: 'FAILED' as const });
-
-    await expect(
-      controller.create(user, 'key-fail', {
-        orderId: 10,
-        method: 'CARD',
-        simulate: 'fail',
-      }),
-    ).resolves.toEqual({
-      id: 1,
-      status: 'FAILED',
-      amount: 50000,
-    });
+    expect(createPayment).toHaveBeenCalledWith(
+      7,
+      'key-success',
+      { orderId: 10, method: 'WALLET' },
+      '127.0.0.1',
+    );
   });
 });

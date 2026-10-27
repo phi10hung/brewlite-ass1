@@ -1,4 +1,11 @@
-import { Body, Controller, Headers, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Headers,
+  Ip,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthUser } from '../auth/auth.types';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -10,6 +17,7 @@ type PaymentResponse = {
   id: number;
   status: PaymentStatus;
   amount: number;
+  payUrl: string | null;
 };
 
 @Controller('payments')
@@ -22,18 +30,20 @@ export class PaymentsController {
     @CurrentUser() user: AuthUser,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() dto: CreatePaymentDto,
+    @Ip() ipAddr: string,
   ): Promise<PaymentResponse> {
     const payment = await this.paymentsService.create(
       user.userId,
       idempotencyKey,
       dto,
+      ipAddr,
     );
 
-    // Payment FAILED vẫn là một resource đã tạo, nên trả 201 như mẫu API.
     return {
       id: payment.id,
       status: payment.status,
       amount: payment.amount,
+      payUrl: payment.payUrl,
     };
   }
 }

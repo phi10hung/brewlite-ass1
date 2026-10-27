@@ -4,6 +4,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { randomBytes } from 'node:crypto';
 import {
   OrderStatus,
   PaymentMethod,
@@ -12,6 +14,7 @@ import {
 import { assertTransition } from '../orders/order-status';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
+import { VnpayClient } from './vnpay.client';
 
 const PAYMENT_SELECT = {
   id: true,
@@ -19,6 +22,7 @@ const PAYMENT_SELECT = {
   method: true,
   status: true,
   amount: true,
+  payUrl: true,
   createdAt: true,
 } as const;
 
@@ -28,8 +32,12 @@ type PaymentView = {
   method: PaymentMethod;
   status: PaymentStatus;
   amount: number;
+  payUrl: string | null;
   createdAt: Date;
 };
+
+const TXN_REF_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const MAX_TXN_REF_ATTEMPTS = 3;
 
 function isUniqueConstraintError(error: unknown): boolean {
   return (
@@ -40,112 +48,191 @@ function isUniqueConstraintError(error: unknown): boolean {
   );
 }
 
+function uniqueTarget(error: unknown): string[] {
+  if (typeof error !== 'object' || error === null || !('meta' in error)) {
+    return [];
+  }
+
+  const meta = (error as { meta?: unknown }).meta;
+  if (!meta || typeof meta !== 'object' || !('target' in meta)) {
+    return [];
+  }
+
+  const target = (meta as { target?: unknown }).target;
+  if (Array.isArray(target)) {
+    return target.filter((value): value is string => typeof value === 'string');
+  }
+  return typeof target === 'string' ? [target] : [];
+}
+
+function randomTxnSuffix(): string {
+  return [...randomBytes(6)]
+    .map((byte) => TXN_REF_CHARS[byte % TXN_REF_CHARS.length])
+    .join('');
+}
+
+function generateTxnRef(orderCode: string): string {
+  const base = orderCode.replace(/[^A-Za-z0-9]/g, '').slice(0, 94);
+  return `${base}${randomTxnSuffix()}`;
+}
+
 @Injectable()
 export class PaymentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly paymentMinutes: number;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly vnpay: VnpayClient,
+    config: ConfigService,
+  ) {
+    const minutes = Number(config.get<string>('ORDER_PAYMENT_MINUTES') ?? 5);
+    this.paymentMinutes =
+      Number.isFinite(minutes) && minutes > 0 ? minutes : 5;
+  }
 
   async create(
     userId: number,
     idempotencyKey: string | undefined,
     dto: CreatePaymentDto,
+    ipAddr?: string,
   ): Promise<PaymentView> {
     const key = this.requireIdempotencyKey(idempotencyKey);
 
     const order = await this.prisma.order.findFirst({
       where: { id: dto.orderId, userId },
-      select: { id: true, status: true, total: true },
+      select: {
+        id: true,
+        code: true,
+        status: true,
+        total: true,
+        expiresAt: true,
+      },
     });
     if (!order) {
       throw new NotFoundException('Không tìm thấy đơn hàng');
     }
 
     // Cùng key phải trả lại đúng kết quả cũ, không tạo thêm Payment.
-    const existing = await this.prisma.payment.findUnique({
-      where: { idempotencyKey: key },
-      select: PAYMENT_SELECT,
-    });
+    const existing = await this.findExistingPayment(key);
     if (existing) {
       this.assertSamePayment(existing, order.id, dto.method);
       return existing;
     }
 
-    const nextStatus = this.resolveNextStatus(order.status, dto.simulate);
-    const paymentStatus =
-      dto.simulate === 'fail' ? PaymentStatus.FAILED : PaymentStatus.SUCCESS;
+    if (
+      order.status !== OrderStatus.PENDING &&
+      order.status !== OrderStatus.PAYMENT_FAILED
+    ) {
+      throw new BadRequestException(
+        `Không thể thanh toán đơn hàng ở trạng thái ${order.status}`,
+      );
+    }
 
-    try {
-      return await this.prisma.$transaction(async (tx) => {
-        const payment = await tx.payment.create({
-          data: {
-            orderId: order.id,
-            method: dto.method,
-            status: paymentStatus,
-            amount: order.total,
-            idempotencyKey: key,
-          },
-          select: PAYMENT_SELECT,
-        });
+    // Hạn thanh toán bắt đầu khi tạo link VNPay. Đơn đã có hạn thì giữ nguyên.
+    const expiresAt = order.expiresAt ?? this.expiresAtFromNow();
+    if (expiresAt.getTime() <= Date.now()) {
+      throw new BadRequestException('Đơn đã hết thời gian thanh toán');
+    }
 
-        // PAYMENT_FAILED phải quay về PENDING trước khi thử thanh toán lại.
-        let currentStatus = order.status;
-        if (currentStatus === OrderStatus.PAYMENT_FAILED) {
-          assertTransition(currentStatus, OrderStatus.PENDING);
-          const reset = await tx.order.updateMany({
-            where: { id: order.id, status: OrderStatus.PAYMENT_FAILED },
-            data: { status: OrderStatus.PENDING },
+    for (let attempt = 1; attempt <= MAX_TXN_REF_ATTEMPTS; attempt++) {
+      const txnRef = generateTxnRef(order.code);
+      const payUrl = this.vnpay.buildPayUrl({
+        txnRef,
+        amount: order.total,
+        orderInfo: `Thanh toan don ${order.code}`,
+        ipAddr: ipAddr ?? '127.0.0.1',
+        expiresAt,
+        bankCode: dto.method === PaymentMethod.CARD ? 'VNBANK' : undefined,
+      });
+
+      try {
+        return await this.prisma.$transaction(async (tx) => {
+          const payment = await tx.payment.create({
+            data: {
+              orderId: order.id,
+              method: dto.method,
+              status: PaymentStatus.PENDING,
+              amount: order.total,
+              idempotencyKey: key,
+              txnRef,
+              payUrl,
+            },
+            select: PAYMENT_SELECT,
           });
-          if (reset.count === 0) {
+
+          const data: {
+            status?: OrderStatus;
+            paymentMethod: PaymentMethod;
+            expiresAt: Date;
+          } = {
+            paymentMethod: dto.method,
+            expiresAt,
+          };
+
+          // PAYMENT_FAILED phải quay về PENDING trước khi tạo link mới.
+          if (order.status === OrderStatus.PAYMENT_FAILED) {
+            assertTransition(order.status, OrderStatus.PENDING);
+            data.status = OrderStatus.PENDING;
+          }
+
+          const updated = await tx.order.updateMany({
+            where: { id: order.id, status: order.status },
+            data,
+          });
+          if (updated.count === 0) {
             throw new ConflictException(
               'Đơn hàng vừa được xử lý bởi một yêu cầu khác',
             );
           }
-          currentStatus = OrderStatus.PENDING;
+
+          return payment;
+        });
+      } catch (error) {
+        if (!isUniqueConstraintError(error)) {
+          throw error;
         }
 
-        // Chỉ cập nhật nếu trạng thái vẫn là trạng thái đã đọc, tránh xử lý hai lần.
-        assertTransition(currentStatus, nextStatus);
-        const updated = await tx.order.updateMany({
-          where: { id: order.id, status: currentStatus },
-          data: { status: nextStatus },
-        });
-        if (updated.count === 0) {
+        // P2002 có thể do trùng idempotencyKey (request đồng thời) hoặc txnRef.
+        const raced = await this.findExistingPayment(key);
+        if (raced) {
+          this.assertSamePayment(raced, order.id, dto.method);
+          return raced;
+        }
+
+        const target = uniqueTarget(error);
+        if (target.includes('idempotencyKey')) {
           throw new ConflictException(
-            'Đơn hàng vừa được xử lý bởi một yêu cầu khác',
+            'Không thể xác định kết quả thanh toán, vui lòng thử lại',
           );
         }
 
-        if (paymentStatus === PaymentStatus.SUCCESS) {
-          const points = Math.floor(order.total / 10000);
-          await tx.user.update({
-            where: { id: userId },
-            data: { loyaltyPoints: { increment: points } },
-          });
-          await tx.loyaltyTransaction.create({
-            data: { userId, orderId: order.id, points },
-          });
+        if (target.includes('txnRef') || target.length === 0) {
+          if (attempt === MAX_TXN_REF_ATTEMPTS) {
+            throw new ConflictException(
+              'Không thể tạo mã giao dịch VNPay, vui lòng thử lại',
+            );
+          }
+          continue;
         }
 
-        return payment;
-      });
-    } catch (error) {
-      if (!isUniqueConstraintError(error)) {
         throw error;
       }
-
-      // Hai request đồng thời cùng key: request thua đọc lại Payment đã thắng.
-      const racedPayment = await this.prisma.payment.findUnique({
-        where: { idempotencyKey: key },
-        select: PAYMENT_SELECT,
-      });
-      if (!racedPayment) {
-        throw new ConflictException(
-          'Không thể xác định kết quả thanh toán, vui lòng thử lại',
-        );
-      }
-
-      this.assertSamePayment(racedPayment, order.id, dto.method);
-      return racedPayment;
     }
+
+    throw new ConflictException(
+      'Không thể tạo mã giao dịch VNPay, vui lòng thử lại',
+    );
+  }
+
+  private findExistingPayment(key: string) {
+    return this.prisma.payment.findUnique({
+      where: { idempotencyKey: key },
+      select: PAYMENT_SELECT,
+    });
+  }
+
+  private expiresAtFromNow(): Date {
+    return new Date(Date.now() + this.paymentMinutes * 60_000);
   }
 
   private requireIdempotencyKey(key: string | undefined): string {
@@ -154,22 +241,6 @@ export class PaymentsService {
       throw new BadRequestException('Thiếu header Idempotency-Key');
     }
     return normalized;
-  }
-
-  private resolveNextStatus(
-    current: OrderStatus,
-    simulate: 'fail' | undefined,
-  ): OrderStatus {
-    if (
-      current !== OrderStatus.PENDING &&
-      current !== OrderStatus.PAYMENT_FAILED
-    ) {
-      throw new BadRequestException(
-        `Không thể thanh toán đơn hàng ở trạng thái ${current}`,
-      );
-    }
-
-    return simulate === 'fail' ? OrderStatus.PAYMENT_FAILED : OrderStatus.PAID;
   }
 
   private assertSamePayment(
