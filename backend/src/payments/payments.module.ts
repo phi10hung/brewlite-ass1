@@ -6,5 +6,6 @@ import { VnpayClient } from './vnpay.client';
 @Module({
   controllers: [PaymentsController],
   providers: [PaymentsService, VnpayClient],
+  exports: [PaymentsService],
 })
 export class PaymentsModule {}

@@ -19,6 +19,7 @@ import { assertTransition } from '../orders/order-status';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { VnpayClient } from './vnpay.client';
+import type { RefundResult } from './vnpay.client';
 
 const PAYMENT_SELECT = {
   id: true,
@@ -154,6 +155,7 @@ function generateTxnRef(orderCode: string): string {
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
   private readonly lastSyncAt = new Map<number, number>();
+  private readonly refunding = new Set<number>();
   private readonly paymentMinutes: number;
 
   constructor(
@@ -567,22 +569,148 @@ export class PaymentsService {
     };
   }
 
-  // Bước 4 sẽ gọi API hoàn tiền VNPay; hiện đánh dấu để không mất giao dịch.
-  async refundOrder(orderId: number): Promise<void> {
-    const updated = await this.prisma.payment.updateMany({
-      where: {
-        orderId,
-        status: PaymentStatus.SUCCESS,
-        refundStatus: null,
-      },
-      data: { refundStatus: RefundStatus.PENDING },
+  async revokeLoyaltyPoints(
+    tx: Prisma.TransactionClient,
+    orderId: number,
+  ): Promise<void> {
+    const earn = await tx.loyaltyTransaction.findUnique({
+      where: { orderId_type: { orderId, type: LoyaltyType.EARN } },
+      select: { userId: true, points: true },
     });
+    if (!earn) return;
 
-    if (updated.count > 0) {
+    const revoked = await tx.loyaltyTransaction.findUnique({
+      where: { orderId_type: { orderId, type: LoyaltyType.REVOKE } },
+      select: { id: true },
+    });
+    if (revoked) return;
+
+    const user = await tx.user.findUnique({
+      where: { id: earn.userId },
+      select: { loyaltyPoints: true },
+    });
+    const pointsToRevoke = Math.max(
+      0,
+      Math.min(earn.points, user?.loyaltyPoints ?? 0),
+    );
+
+    if (pointsToRevoke > 0) {
+      await tx.user.update({
+        where: { id: earn.userId },
+        data: { loyaltyPoints: { decrement: pointsToRevoke } },
+      });
+    }
+    await tx.loyaltyTransaction.create({
+      data: {
+        userId: earn.userId,
+        orderId,
+        type: LoyaltyType.REVOKE,
+        points: -pointsToRevoke,
+      },
+    });
+  }
+
+  async refundOrder(orderId: number): Promise<void> {
+    if (this.refunding.has(orderId)) return;
+    this.refunding.add(orderId);
+
+    try {
+      const payment = await this.prisma.payment.findFirst({
+        where: { orderId, status: PaymentStatus.SUCCESS },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        select: PAYMENT_RESULT_SELECT,
+      });
+      if (!payment || payment.refundStatus === RefundStatus.SUCCESS) {
+        return;
+      }
+
+      await this.prisma.payment.update({
+        where: { id: payment.id },
+        data: { refundStatus: RefundStatus.PENDING },
+      });
+
+      let result: RefundResult;
+      try {
+        result = await this.vnpay.refund({
+          txnRef: payment.txnRef ?? '',
+          amount: payment.amount,
+          transactionNo: payment.transactionNo ?? '',
+          transactionDate: payment.payDate ?? '',
+          createBy: 'BrewLite',
+        });
+      } catch (error) {
+        await this.markRefundFailed(payment.id, orderId, error);
+        return;
+      }
+
+      if (result.responseCode === '00') {
+        await this.prisma.payment.update({
+          where: { id: payment.id },
+          data: {
+            refundStatus: RefundStatus.SUCCESS,
+            refundedAt: new Date(),
+          },
+        });
+        return;
+      }
+
+      await this.prisma.payment.update({
+        where: { id: payment.id },
+        data: { refundStatus: RefundStatus.FAILED },
+      });
       this.logger.warn(
-        `Đơn ${orderId} thanh toán sau khi hủy, đã đánh dấu chờ hoàn tiền`,
+        `Hoàn tiền VNPay thất bại cho đơn ${orderId}: ${result.responseCode} ${result.message}`,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Không thể hoàn tiền đơn ${orderId}: ${this.errorMessage(error)}`,
+      );
+    } finally {
+      this.refunding.delete(orderId);
+    }
+  }
+
+  async retryRefunds(): Promise<void> {
+    const cutoff = new Date(Date.now() - 60_000);
+
+    try {
+      const payments = await this.prisma.payment.findMany({
+        where: {
+          refundStatus: {
+            in: [RefundStatus.PENDING, RefundStatus.FAILED],
+          },
+          createdAt: { lt: cutoff },
+        },
+        select: { orderId: true },
+        distinct: ['orderId'],
+      });
+
+      for (const payment of payments) {
+        await this.refundOrder(payment.orderId);
+      }
+    } catch (error) {
+      this.logger.warn(`Không thể thử lại hoàn tiền: ${this.errorMessage(error)}`);
+    }
+  }
+
+  private async markRefundFailed(
+    paymentId: number,
+    orderId: number,
+    error: unknown,
+  ): Promise<void> {
+    try {
+      await this.prisma.payment.update({
+        where: { id: paymentId },
+        data: { refundStatus: RefundStatus.FAILED },
+      });
+    } catch (updateError) {
+      this.logger.warn(
+        `Không cập nhật được trạng thái hoàn tiền đơn ${orderId}: ${this.errorMessage(updateError)}`,
       );
     }
+    this.logger.warn(
+      `Hoàn tiền VNPay lỗi cho đơn ${orderId}: ${this.errorMessage(error)}`,
+    );
   }
 
   private async currentOutcome(
