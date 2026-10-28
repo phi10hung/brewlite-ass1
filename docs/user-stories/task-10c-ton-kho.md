@@ -1,23 +1,23 @@
 # Task 10c: Kiểm soát tồn kho khi đặt đồng thời
 
+**Người viết:** Quang · **Issue:** #20, #77 · **Sprint:** 3
+
 ## User Story
 
-Là chủ quán, tôi muốn hệ thống tự trừ tồn kho khi khách đặt đơn và không bao giờ bán vượt số ly còn lại, để tránh nhận đơn cho món đã hết hàng ngay cả khi nhiều khách đặt cùng lúc.
+Là chủ quán, tôi muốn hệ thống tự tính số ly còn pha được từ kho nguyên liệu theo công thức pha chế và trừ nguyên liệu khi khách đặt, để không nhận đơn khi đã hết nguyên liệu, kể cả khi nhiều khách đặt cùng lúc.
 
 ## Tiêu chí chấp nhận
 
-1. Khi đặt đơn thành công, tồn kho của từng món giảm đúng bằng tổng số lượng đã đặt (cộng dồn nếu cùng món xuất hiện ở nhiều dòng).
-2. Việc trừ kho và tạo đơn nằm trong cùng một transaction: nếu một món hết hàng thì toàn bộ đơn bị hủy, không món nào bị trừ kho.
-3. Khi không đủ hàng, API trả về lỗi 400 với thông báo rõ ràng, ví dụ "Món Latte chỉ còn 0 ly".
-4. Hai đơn đặt đồng thời cho món chỉ còn 1 ly: đúng một đơn thành công, đơn còn lại bị từ chối, tồn kho không bao giờ âm.
-5. Hệ thống dùng cột `version` (optimistic locking) để phát hiện xung đột và tự thử lại tối đa 10 lần, mỗi lần chờ ngẫu nhiên vài mili giây; nếu vẫn xung đột thì trả lỗi 409 "Hệ thống đang bận, vui lòng đặt lại sau giây lát".
-6. 20 đơn đặt cùng lúc cho món còn đủ hàng: cả 20 đơn thành công, kho giảm đúng 20.
+1. Mỗi món có công thức pha chế (lượng nguyên liệu cho size M); size S dùng 0,8 lần, L dùng 1,3 lần (làm tròn lên); mỗi topping cũng có công thức riêng.
+2. Số ly còn pha được = nhỏ nhất của (tồn kho từng nguyên liệu ÷ lượng cần cho 1 ly); các món dùng chung nguyên liệu ảnh hưởng lẫn nhau.
+3. Đặt đơn trừ nguyên liệu và tạo đơn trong cùng một transaction; thiếu nguyên liệu thì không tạo đơn, không trừ gì, trả 400 "Món X không đủ nguyên liệu, chỉ còn pha được N ly".
+4. Nhiều đơn đặt đồng thời (kể cả các món dùng chung nguyên liệu) không bao giờ làm âm kho nguyên liệu (test c).
+5. Trừ kho bằng optimistic locking theo `version` của từng nguyên liệu, thử lại tối đa 10 lần, quá thì 409 "Hệ thống đang bận, vui lòng đặt lại sau giây lát".
+6. Hủy đơn (khách hủy, nhân viên hủy, tự hủy khi quá hạn) trả lại đúng lượng nguyên liệu đã trừ, chỉ trả 1 lần.
+7. `GET /products` trả `stock` = số ly size S còn pha được; `POST /products/availability` trả số ly còn thêm được cho món đang chọn, có tính các món trong giỏ.
 
 ## Ghi chú kỹ thuật
 
 - Trừ kho bằng `updateMany` với điều kiện `version` khớp lúc đọc, đồng thời tăng `version` lên 1.
-- Các món được xử lý theo thứ tự `productId` tăng dần để tránh khóa chéo giữa các đơn.
+- Các món được xử lý theo thứ tự `ingredientId` tăng dần để tránh khóa chéo giữa các đơn.
 - Kiểm thử: unit test mô phỏng kho trong bộ nhớ, bắn 2 đơn song song bằng `Promise.allSettled` (test c).
-
-# ...
-   **Người viết:** Quang · **Issue:** #20 · **Sprint:** 3
