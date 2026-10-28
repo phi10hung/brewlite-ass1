@@ -13,6 +13,7 @@ export type BuildPayUrlInput = {
   amount: number;
   orderInfo: string;
   ipAddr: string;
+  createDate: Date;
   expiresAt: Date;
   bankCode?: string;
 };
@@ -168,7 +169,7 @@ export class VnpayClient {
       vnp_Amount: String(Math.round(input.amount * 100)),
       vnp_ReturnUrl: this.returnUrl,
       vnp_IpAddr: normalizeIpAddress(input.ipAddr),
-      vnp_CreateDate: formatVnpayDate(new Date()),
+      vnp_CreateDate: formatVnpayDate(input.createDate),
       vnp_ExpireDate: formatVnpayDate(input.expiresAt),
     };
 

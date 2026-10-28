@@ -212,6 +212,9 @@ export class PaymentsService {
       throw new BadRequestException('Đơn đã hết thời gian thanh toán');
     }
 
+    // Dùng chung một mốc thời gian cho link VNPay và Payment để querydr khớp ngày.
+    const createdAt = new Date();
+
     for (let attempt = 1; attempt <= MAX_TXN_REF_ATTEMPTS; attempt++) {
       const txnRef = generateTxnRef(order.code);
       const payUrl = this.vnpay.buildPayUrl({
@@ -219,6 +222,7 @@ export class PaymentsService {
         amount: order.total,
         orderInfo: `Thanh toan don ${order.code}`,
         ipAddr: ipAddr ?? '127.0.0.1',
+        createDate: createdAt,
         expiresAt,
         bankCode: dto.method === PaymentMethod.CARD ? 'VNBANK' : undefined,
       });
@@ -234,6 +238,7 @@ export class PaymentsService {
               idempotencyKey: key,
               txnRef,
               payUrl,
+              createdAt,
             },
             select: PAYMENT_SELECT,
           });
