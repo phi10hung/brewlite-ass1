@@ -456,3 +456,199 @@ describe('OrdersService - đặt đơn mới hủy đơn chờ cũ', () => {
     expect(cancel).not.toHaveBeenCalled();
   });
 });
+
+describe('OrdersService - hủy đơn', () => {
+  type FakeOrder = { id: number; userId: number; status: string };
+
+  // Dựng DB giả: 1 đơn dùng 2 nguyên liệu (id 1: 18g, id 2: 150ml), kho đang còn 100 và 1000
+  function setupCancel(order: FakeOrder) {
+    const orders = new Map<number, FakeOrder>([[order.id, { ...order }]]);
+    const stock = new Map<number, number>([
+      [1, 100],
+      [2, 1000],
+    ]);
+    const used = [
+      { orderId: order.id, ingredientId: 1, amount: 18 },
+      { orderId: order.id, ingredientId: 2, amount: 150 },
+    ];
+
+    const tx = {
+      order: {
+        // Giống code thật: khách chỉ thấy đơn của mình (userId truyền vào where)
+        findFirst: jest.fn(
+          async ({ where }: { where: { id: number; userId?: number } }) => {
+            const o = orders.get(where.id);
+            if (!o) return null;
+            if (where.userId !== undefined && o.userId !== where.userId) {
+              return null;
+            }
+            return { id: o.id, status: o.status };
+          },
+        ),
+        // Chỉ đổi khi trạng thái còn đúng như lúc đọc, giống khóa lạc quan ở code thật
+        updateMany: jest.fn(
+          async ({
+            where,
+            data,
+          }: {
+            where: { id: number; status: string };
+            data: { status: string };
+          }) => {
+            const o = orders.get(where.id);
+            if (!o || o.status !== where.status) return { count: 0 };
+            o.status = data.status;
+            return { count: 1 };
+          },
+        ),
+        findUnique: jest.fn(async ({ where }: { where: { id: number } }) => {
+          const o = orders.get(where.id);
+          return o ? { ...o, payments: [] } : null;
+        }),
+      },
+      orderIngredient: {
+        findMany: jest.fn(async ({ where }: { where: { orderId: number } }) =>
+          used.filter((u) => u.orderId === where.orderId),
+        ),
+      },
+      ingredient: {
+        update: jest.fn(
+          async ({
+            where,
+            data,
+          }: {
+            where: { id: number };
+            data: { stock: { increment: number } };
+          }) => {
+            stock.set(where.id, (stock.get(where.id) ?? 0) + data.stock.increment);
+            return {};
+          },
+        ),
+      },
+    };
+
+    const prisma = {
+      ...tx,
+      $transaction: jest.fn(async (fn: (t: unknown) => unknown) => fn(tx)),
+    };
+    const paymentsMock = {
+      revokeLoyaltyPoints: jest.fn().mockResolvedValue(undefined),
+      refundOrder: jest.fn().mockResolvedValue(undefined),
+    };
+
+    
+    const promotionsMock = { calculate: jest.fn() };
+
+    const service = new OrdersService(
+      prisma as never,
+      promotionsMock as never,
+      paymentsMock as never,
+    );
+    return { service, prisma, orders, stock, paymentsMock };
+  }
+
+  it('khách hủy đơn PENDING: nguyên liệu được trả lại đủ', async () => {
+    const { service, orders, stock, paymentsMock } = setupCancel({
+      id: 1,
+      userId: 7,
+      status: 'PENDING',
+    });
+
+    await service.cancel(1, 'CUSTOMER', 7);
+
+    expect(orders.get(1)?.status).toBe('CANCELLED');
+    expect(stock.get(1)).toBe(118);
+    expect(stock.get(2)).toBe(1150);
+    // Chưa trả tiền thì không có gì để thu hồi hay hoàn
+    expect(paymentsMock.revokeLoyaltyPoints).not.toHaveBeenCalled();
+    expect(paymentsMock.refundOrder).not.toHaveBeenCalled();
+  });
+
+  it('hủy đơn đã PAID: thu hồi điểm tích lũy và gọi hoàn tiền', async () => {
+    const { service, stock, paymentsMock } = setupCancel({
+      id: 1,
+      userId: 7,
+      status: 'PAID',
+    });
+
+    await service.cancel(1, 'CUSTOMER', 7);
+
+    expect(stock.get(1)).toBe(118);
+    expect(paymentsMock.revokeLoyaltyPoints).toHaveBeenCalledTimes(1);
+    expect(paymentsMock.refundOrder).toHaveBeenCalledWith(1);
+  });
+
+  it('khách hủy đơn của người khác: 404 và kho không đổi', async () => {
+    const { service, stock } = setupCancel({
+      id: 1,
+      userId: 7,
+      status: 'PENDING',
+    });
+
+    await expect(service.cancel(1, 'CUSTOMER', 99)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(stock.get(1)).toBe(100);
+  });
+
+  it('đơn đang PREPARING không hủy được: 400 và kho không đổi', async () => {
+    const { service, orders, stock } = setupCancel({
+      id: 1,
+      userId: 7,
+      status: 'PREPARING',
+    });
+
+    await expect(service.cancel(1, 'CUSTOMER', 7)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(orders.get(1)?.status).toBe('PREPARING');
+    expect(stock.get(1)).toBe(100);
+  });
+
+  it('trạng thái đổi giữa lúc đọc và lúc ghi: 409 và không trả nguyên liệu', async () => {
+    const { service, prisma, stock } = setupCancel({
+      id: 1,
+      userId: 7,
+      status: 'PENDING',
+    });
+    // Giả lập nhân viên vừa bấm "Nhận đơn": updateMany không khớp dòng nào
+    prisma.order.updateMany.mockResolvedValueOnce({ count: 0 });
+
+    await expect(service.cancel(1, 'CUSTOMER', 7)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+    expect(stock.get(1)).toBe(100);
+  });
+
+  it('2 lệnh hủy cùng lúc: chỉ một lệnh thắng, nguyên liệu trả đúng 1 lần', async () => {
+    const { service, stock } = setupCancel({
+      id: 1,
+      userId: 7,
+      status: 'PENDING',
+    });
+
+    const results = await Promise.allSettled([
+      service.cancel(1, 'CUSTOMER', 7),
+      service.cancel(1, 'CUSTOMER', 7),
+    ]);
+
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter((r) => r.status === 'rejected')).toHaveLength(1);
+    // Nếu trả 2 lần thì sẽ là 136 và 1300
+    expect(stock.get(1)).toBe(118);
+    expect(stock.get(2)).toBe(1150);
+  });
+
+  it('STAFF và SYSTEM hủy được đơn của bất kỳ ai (không lọc userId)', async () => {
+    const staff = setupCancel({ id: 1, userId: 7, status: 'PENDING' });
+    await staff.service.cancel(1, 'STAFF');
+    expect(staff.prisma.order.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 1 } }),
+    );
+    expect(staff.stock.get(1)).toBe(118);
+
+    const system = setupCancel({ id: 2, userId: 8, status: 'PAYMENT_FAILED' });
+    await system.service.cancel(2, 'SYSTEM');
+    expect(system.orders.get(2)?.status).toBe('CANCELLED');
+    expect(system.stock.get(2)).toBe(1150);
+  });
+});
