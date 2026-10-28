@@ -186,14 +186,14 @@ export default function CheckoutPage() {
   if (items.length === 0) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-10">
-        <div className="rounded-2xl border border-neutral-700 bg-neutral-950 p-8 text-center">
+        <div className="rounded-2xl border border-stone-200 bg-white p-8 text-center">
           <div className="mb-4 text-5xl">🛒</div>
 
           <h1 className="text-2xl font-bold">
             Không có sản phẩm để thanh toán
           </h1>
 
-          <p className="mt-2 text-neutral-400">
+          <p className="mt-2 text-stone-500">
             Hãy thêm đồ uống vào giỏ hàng trước.
           </p>
 
@@ -221,7 +221,7 @@ export default function CheckoutPage() {
         Thanh toán
       </h1>
 
-      <p className="mt-2 text-neutral-400">
+      <p className="mt-2 text-stone-500">
         Kiểm tra đơn hàng và chọn phương thức thanh toán.
       </p>
 
@@ -229,12 +229,12 @@ export default function CheckoutPage() {
         {/* LEFT */}
         <section className="space-y-6">
           {/* ITEMS */}
-          <div className="rounded-2xl border border-neutral-700 p-5">
+          <div className="rounded-2xl border border-stone-200 bg-white p-5">
             <h2 className="text-xl font-bold">
               Đơn hàng của bạn
             </h2>
 
-            <div className="mt-4 divide-y divide-neutral-800">
+            <div className="mt-4 divide-y divide-stone-200">
               {items.map((item) => (
                 <div
                   key={`${item.productId}-${item.size}-${item.toppingIds
@@ -248,17 +248,17 @@ export default function CheckoutPage() {
                       {item.name}
                     </h3>
 
-                    <p className="mt-1 text-sm text-neutral-400">
+                    <p className="mt-1 text-sm text-stone-500">
                       Size {item.size}
                     </p>
 
                     {item.toppings.length > 0 && (
-                      <p className="mt-1 text-sm text-neutral-400">
+                      <p className="mt-1 text-sm text-stone-500">
                         {item.toppings.join(", ")}
                       </p>
                     )}
 
-                    <p className="mt-1 text-sm text-neutral-400">
+                    <p className="mt-1 text-sm text-stone-500">
                       Số lượng: {item.quantity}
                     </p>
                   </div>
@@ -274,12 +274,12 @@ export default function CheckoutPage() {
           </div>
 
           {/* PROMOTION */}
-          <div className="rounded-2xl border border-neutral-700 p-5">
+          <div className="rounded-2xl border border-stone-200 bg-white p-5">
             <h2 className="text-xl font-bold">
               Mã giảm giá
             </h2>
 
-            <p className="mt-1 text-sm text-neutral-400">
+            <p className="mt-1 text-sm text-stone-500">
               Nhập mã khuyến mãi nếu bạn có.
             </p>
 
@@ -292,7 +292,7 @@ export default function CheckoutPage() {
                   setPromotionError(null);
                 }}
                 placeholder="Ví dụ: GIAM10"
-                className="min-w-0 flex-1 rounded-xl border border-neutral-700 bg-transparent px-4 py-3 outline-none focus:border-amber-600"
+                className="min-w-0 flex-1 rounded-xl border border-stone-200 bg-transparent px-4 py-3 outline-none focus:border-amber-600"
               />
 
               <button
@@ -308,13 +308,13 @@ export default function CheckoutPage() {
             </div>
 
             {promotionError && (
-              <p className="mt-3 text-sm text-red-500">
+              <p className="mt-3 text-sm text-red-700">
                 {promotionError}
               </p>
             )}
 
             {appliedPromotionCode && discount > 0 && (
-              <p className="mt-3 text-sm font-medium text-green-500">
+              <p className="mt-3 text-sm font-medium text-green-700">
                 Đã áp dụng mã {appliedPromotionCode}: giảm{" "}
                 {formatPrice(discount)}
               </p>
@@ -322,13 +322,13 @@ export default function CheckoutPage() {
           </div>
 
           {/* PAYMENT METHOD */}
-          <div className="rounded-2xl border border-neutral-700 p-5">
+          <div className="rounded-2xl border border-stone-200 bg-white p-5">
             <h2 className="text-xl font-bold">
               Phương thức thanh toán
             </h2>
 
             <div className="mt-4 space-y-3">
-              <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-neutral-700 p-4">
+              <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-stone-200 p-4">
                 <input
                   type="radio"
                   name="paymentMethod"
@@ -339,10 +339,13 @@ export default function CheckoutPage() {
 
                 <span>
                   <strong>Ví điện tử</strong>
+                  <span className="mt-0.5 block text-sm text-stone-500">
+                    Chọn ví hoặc ứng dụng trên trang VNPay
+                  </span>
                 </span>
               </label>
 
-              <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-neutral-700 p-4">
+              <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-stone-200 p-4">
                 <input
                   type="radio"
                   name="paymentMethod"
@@ -352,7 +355,10 @@ export default function CheckoutPage() {
                 />
 
                 <span>
-                  <strong>Thẻ</strong>
+                  <strong>Thẻ ngân hàng</strong>
+                  <span className="mt-0.5 block text-sm text-stone-500">
+                    Thẻ ATM nội địa qua VNPay
+                  </span>
                 </span>
               </label>
             </div>
@@ -360,28 +366,27 @@ export default function CheckoutPage() {
         </section>
 
         {/* SUMMARY */}
-        <aside className="h-fit rounded-2xl border border-neutral-700 p-5 lg:sticky lg:top-6">
-          <h2 className="text-xl font-bold">
+        <aside className="h-fit rounded-2xl border border-stone-200 bg-white p-5 lg:sticky lg:top-6">          <h2 className="text-xl font-bold">
             Tóm tắt thanh toán
           </h2>
-          <p className="mt-2 text-sm text-neutral-400">
+          <p className="mt-2 text-sm text-stone-500">
              Điểm thưởng hiện có: {loyaltyPoints}
            </p>
 
           <div className="mt-5 space-y-3">
-            <div className="flex justify-between text-neutral-400">
+            <div className="flex justify-between text-stone-500">
               <span>Tạm tính</span>
               <span>{formatPrice(totalPrice)}</span>
             </div>
 
-            <div className="flex justify-between text-neutral-400">
+            <div className="flex justify-between text-stone-500">
               <span>Giảm giá</span>
               <span>
                 -{formatPrice(discount)}
               </span>
             </div>
 
-            <div className="border-t border-neutral-700 pt-4">
+            <div className="border-t border-stone-200 pt-4">
               <div className="flex items-center justify-between">
                 <strong>Tổng thanh toán</strong>
 
@@ -393,7 +398,7 @@ export default function CheckoutPage() {
           </div>
 
           {error && (
-            <div className="mt-5 rounded-xl border border-red-900 bg-red-950/30 p-3 text-sm text-red-400">
+            <div className="mt-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
               {error}
               {pendingLink && (
                 <Link
@@ -417,7 +422,7 @@ export default function CheckoutPage() {
               : `Thanh toán ${formatPrice(finalTotal)}`}
           </button>
 
-          <p className="mt-3 text-center text-xs text-neutral-500">
+          <p className="mt-3 text-center text-xs text-stone-500">
             Bạn sẽ được chuyển sang trang thanh toán VNPay (môi trường thử nghiệm, không trừ tiền thật).
           </p>
         </aside>
