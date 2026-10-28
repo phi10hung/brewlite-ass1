@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import { getOrderStatus } from '@/lib/order-status';
+import IngredientTable from './ingredient-table';
 
 type OrderStatus =
   | 'PENDING'
@@ -231,6 +232,8 @@ export default function StaffPage() {
           })}
         </ul>
       )}
+
+      <IngredientTable />
     </main>
   );
 }
