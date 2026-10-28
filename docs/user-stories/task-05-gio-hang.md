@@ -1,6 +1,6 @@
 # User Story – Task 5: Giỏ hàng
 
-**Người viết:** Linh · **Issue:** #8 · **Sprint:** 1
+**Người viết:** Linh · **Issue:** #8, #79 · **Sprint:** 1, 3.
 
 **Là** khách hàng,
 **tôi muốn** cho đồ uống đã chọn vào giỏ, sửa số lượng hoặc xoá món, và xem tổng tiền,
@@ -15,4 +15,5 @@
 - [x] Giỏ trống thì hiện thông báo và nút quay lại menu
 - [ ] Bấm "Thêm vào giỏ" ở trang chi tiết (chờ nối với trang của Búp)
 - [ ] Badge số lượng trên Navbar (chờ layout của Khoa)
-- [x] Mỗi món tối đa 20 ly (khớp giới hạn của API): gộp món hoặc bấm "+" không vượt 20, nút "+" mờ khi đủ 20
+- [x] Nút "+" giới hạn theo số ly còn pha được từ kho nguyên liệu (có tính nguyên liệu các món khác trong giỏ), hiện "Chỉ còn pha được X ly"
+- [x] Các món trong giỏ dùng chung nguyên liệu (kể cả topping) mà cộng lại vượt kho thì tô đỏ dòng vượt, hiện cảnh báo ở đầu cột tổng tiền, chưa cho Tiến hành thanh toán
