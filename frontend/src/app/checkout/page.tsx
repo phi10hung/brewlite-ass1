@@ -11,12 +11,6 @@ import { useAuthStore } from "@/store/auth";
 
 type PaymentMethod = "WALLET" | "CARD";
 
-type PaymentResponse = {
-  id: number;
-  status: "SUCCESS" | "FAILED";
-  amount: number;
-};
-
 type OrderResponse = {
   id: number;
   code?: string;
@@ -43,7 +37,6 @@ export default function CheckoutPage() {
 
   const items = useCartStore((state) => state.items);
   const totalPrice = useCartStore((state) => state.totalPrice());
-  const clear = useCartStore((state) => state.clear);
   const token = useAuthStore((state) => state.token);
   const hydrated = useAuthStore((state) => state.hydrated);
   const user = useAuthStore((state) => state.user);
@@ -73,11 +66,9 @@ export default function CheckoutPage() {
   const [method, setMethod] =
     useState<PaymentMethod>("WALLET");
 
-  const [simulateFail, setSimulateFail] = useState(false);
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pendingOrderId, setPendingOrderId] = useState<number | null>(null);
+  const [pendingLink, setPendingLink] = useState<string | null>(null);
 
   // Promotion
   const [promotionCode, setPromotionCode] = useState("");
@@ -135,7 +126,7 @@ export default function CheckoutPage() {
     }
   }
 
-  async function handleCheckout() {
+    async function handleCheckout() {
     if (items.length === 0) {
       router.push("/cart");
       return;
@@ -143,79 +134,51 @@ export default function CheckoutPage() {
 
     setLoading(true);
     setError(null);
-
-    // Một key cho lần bấm thanh toán này.
-    // Nếu bổ sung retry do network sau này, phải tái sử dụng key này.
-    const idempotencyKey = crypto.randomUUID();
+    setPendingLink(null);
 
     try {
-      // Thanh toán lỗi trước đó → dùng lại đúng đơn cũ, KHÔNG tạo đơn mới
-      // (tránh đơn rác và trừ kho 2 lần)
-      let orderId = pendingOrderId;
+      // 1. Tạo đơn (backend kiểm tra và giữ nguyên liệu 5 phút)
+      const order = await apiFetch<OrderResponse>("/orders", {
+        method: "POST",
+        body: JSON.stringify({
+          items: items.map((item) => ({
+            productId: item.productId,
+            size: item.size,
+            toppingIds: item.toppingIds,
+            quantity: item.quantity,
+          })),
+          ...(appliedPromotionCode
+            ? { promotionCode: appliedPromotionCode }
+            : {}),
+          paymentMethod: method,
+        }),
+      });
 
-      if (orderId === null) {
-        const order = await apiFetch<OrderResponse>("/orders", {
+      // 2. Tạo link thanh toán VNPay cho đơn vừa tạo
+      try {
+        const payment = await apiFetch<{ payUrl: string }>("/payments", {
           method: "POST",
-          body: JSON.stringify({
-            items: items.map((item) => ({
-              productId: item.productId,
-              size: item.size,
-              toppingIds: item.toppingIds,
-              quantity: item.quantity,
-            })),
-            ...(appliedPromotionCode
-              ? { promotionCode: appliedPromotionCode }
-              : {}),
-          }),
+          headers: { "Idempotency-Key": crypto.randomUUID() },
+          body: JSON.stringify({ orderId: order.id, method }),
         });
 
-        if (!order.id) {
-          throw new Error("API tạo đơn không trả về order id.");
-        }
-        orderId = order.id;
-        setPendingOrderId(order.id);
+        // 3. Sang trang VNPay (KHÔNG xoá giỏ ở đây, không tắt loading)
+        window.location.href = payment.payUrl;
+      } catch {
+        // Đơn đã tạo nhưng chưa lấy được link
+        setError(
+          "Chưa tạo được thanh toán VNPay. Bạn có thể thanh toán tiếp trong trang đơn hàng."
+        );
+        setPendingLink(`/orders/${order.id}`);
+        setLoading(false);
       }
-
-      if (orderId === null) {
-        throw new Error("Không xác định được mã đơn hàng.");
-      }
-      
-      const payment = await apiFetch<PaymentResponse>(
-  "/payments",
-  {
-    method: "POST",
-    headers: {
-      "Idempotency-Key": idempotencyKey,
-    },
-    body: JSON.stringify({
-      orderId: orderId,
-      method,
-      ...(simulateFail
-        ? {
-            simulate: "fail",
-          }
-        : {}),
-    }),
-  }
-);
-
-if (payment.status !== "SUCCESS") {
-  throw new Error("Thanh toán thất bại. Hãy thử lại.");
-}
-
-      // Thành công: quên đơn đang chờ, xoá giỏ, sang trang xác nhận
-      setPendingOrderId(null);
-      clear();
-
-      router.push(`/orders/${orderId}`);
     } catch (err) {
-      // CỐ Ý không clear giỏ khi có lỗi.
+      // Lỗi tạo đơn (vd: thiếu nguyên liệu) → ở lại trang, giữ giỏ
       setError(
         err instanceof Error
           ? err.message
           : "Có lỗi xảy ra khi thanh toán."
       );
-    } finally {
       setLoading(false);
     }
   }
@@ -393,18 +356,6 @@ if (payment.status !== "SUCCESS") {
                 </span>
               </label>
             </div>
-
-            <label className="mt-5 flex cursor-pointer items-center gap-3 text-sm text-neutral-400">
-              <input
-                type="checkbox"
-                checked={simulateFail}
-                onChange={(event) =>
-                  setSimulateFail(event.target.checked)
-                }
-              />
-
-              Giả lập thanh toán lỗi
-            </label>
           </div>
         </section>
 
@@ -444,6 +395,14 @@ if (payment.status !== "SUCCESS") {
           {error && (
             <div className="mt-5 rounded-xl border border-red-900 bg-red-950/30 p-3 text-sm text-red-400">
               {error}
+              {pendingLink && (
+                <Link
+                  href={pendingLink}
+                  className="mt-2 block font-semibold underline"
+                >
+                  Xem đơn hàng
+                </Link>
+              )}
             </div>
           )}
 
@@ -454,12 +413,12 @@ if (payment.status !== "SUCCESS") {
             className="mt-6 w-full rounded-xl bg-amber-700 px-4 py-3 font-bold text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading
-              ? "Đang xử lý..."
-              : "Xác nhận thanh toán"}
+              ? "Đang chuyển sang VNPay…"
+              : `Thanh toán ${formatPrice(finalTotal)}`}
           </button>
 
           <p className="mt-3 text-center text-xs text-neutral-500">
-            Không đóng trang trong lúc đang xử lý thanh toán.
+            Bạn sẽ được chuyển sang trang thanh toán VNPay (môi trường thử nghiệm, không trừ tiền thật).
           </p>
         </aside>
       </div>
