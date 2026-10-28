@@ -162,6 +162,7 @@ describe('PaymentsService', () => {
         idempotencyKey: 'key-success',
         txnRef: expect.stringMatching(/^BL7K2M9Q[A-Z0-9]{6}$/),
         payUrl: 'https://vnpay.test/pay',
+        createdAt: expect.any(Date),
       },
       select: expect.anything(),
     });
@@ -181,14 +182,21 @@ describe('PaymentsService', () => {
       }),
     );
     expect(vnpayMock.buildPayUrl.mock.calls[0][0].bankCode).toBeUndefined();
+
+    const createArgs = prismaMock.payment.create.mock.calls[0][0] as {
+      data: { createdAt: Date };
+    };
+    const buildArgs = vnpayMock.buildPayUrl.mock.calls[0][0] as {
+      createDate: Date;
+    };
+    expect(buildArgs.createDate).toBe(createArgs.data.createdAt);
+
     expect(result).toEqual(payment());
   });
 
   it('CARD gửi bankCode VNBANK', async () => {
     mockOrder();
-    prismaMock.payment.create.mockResolvedValue(
-      payment({ method: 'CARD' }),
-    );
+    prismaMock.payment.create.mockResolvedValue(payment({ method: 'CARD' }));
 
     await service.create(
       7,
@@ -399,12 +407,16 @@ describe('PaymentsService', () => {
       userId: 7,
     });
 
-    const result = await service.applyResult(payment(), {
-      responseCode: '00',
-      transactionStatus: '00',
-      transactionNo: 'VNP123',
-      payDate: '20261027230000',
-    });
+    const result = await service.applyResult(
+      payment(),
+      {
+        responseCode: '00',
+        transactionStatus: '00',
+        transactionNo: 'VNP123',
+        payDate: '20261027230000',
+      },
+      'SUCCESS',
+    );
 
     expect(result).toEqual({
       orderId: 10,
@@ -464,8 +476,8 @@ describe('PaymentsService', () => {
       transactionNo: 'VNP123',
       payDate: '20261027230000',
     };
-    await service.applyResult(payment(), result);
-    await service.applyResult(payment(), result);
+    await service.applyResult(payment(), result, 'SUCCESS');
+    await service.applyResult(payment(), result, 'SUCCESS');
 
     expect(prismaMock.user.update).toHaveBeenCalledTimes(1);
     expect(prismaMock.loyaltyTransaction.create).toHaveBeenCalledTimes(1);
@@ -486,12 +498,16 @@ describe('PaymentsService', () => {
       })
       .mockResolvedValueOnce({ status: 'PAYMENT_FAILED' });
 
-    const result = await service.applyResult(payment(), {
-      responseCode: '24',
-      transactionStatus: '',
-      transactionNo: '',
-      payDate: '',
-    });
+    const result = await service.applyResult(
+      payment(),
+      {
+        responseCode: '24',
+        transactionStatus: '',
+        transactionNo: '',
+        payDate: '',
+      },
+      'FAILED',
+    );
 
     expect(result).toEqual({
       orderId: 10,
@@ -526,12 +542,16 @@ describe('PaymentsService', () => {
     prismaMock.order.updateMany.mockResolvedValue({ count: 0 });
     const refundSpy = jest.spyOn(service, 'refundOrder').mockResolvedValue();
 
-    const result = await service.applyResult(payment(), {
-      responseCode: '00',
-      transactionStatus: '00',
-      transactionNo: 'VNP123',
-      payDate: '20261027230000',
-    });
+    const result = await service.applyResult(
+      payment(),
+      {
+        responseCode: '00',
+        transactionStatus: '00',
+        transactionNo: 'VNP123',
+        payDate: '20261027230000',
+      },
+      'SUCCESS',
+    );
 
     expect(result).toEqual({
       orderId: 10,
@@ -688,6 +708,101 @@ describe('PaymentsService', () => {
     expect(applySpy).toHaveBeenCalledTimes(1);
   });
 
+  it('syncOrder querydr 00 + 01: giữ PENDING và không ghi gì', async () => {
+    prismaMock.order.findUnique.mockResolvedValue({
+      id: 10,
+      status: 'PENDING',
+    });
+    prismaMock.payment.findFirst.mockResolvedValue(
+      payment({ status: 'PENDING' }),
+    );
+    vnpayMock.queryTransaction.mockResolvedValue({
+      responseCode: '00',
+      transactionStatus: '01',
+      transactionNo: '',
+      payDate: '',
+      message: 'pending',
+      raw: {},
+    });
+
+    await expect(service.syncOrder(10)).resolves.toEqual({
+      orderStatus: 'PENDING',
+    });
+
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    expect(prismaMock.payment.updateMany).not.toHaveBeenCalled();
+    expect(prismaMock.order.updateMany).not.toHaveBeenCalled();
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+  });
+
+  it.each(['94', '91'])(
+    'syncOrder querydr %s: không đổi Payment hay đơn',
+    async (responseCode) => {
+      prismaMock.order.findUnique.mockResolvedValue({
+        id: 10,
+        status: 'PENDING',
+      });
+      prismaMock.payment.findFirst.mockResolvedValue(
+        payment({ status: 'PENDING' }),
+      );
+      vnpayMock.queryTransaction.mockResolvedValue({
+        responseCode,
+        transactionStatus: '',
+        transactionNo: '',
+        payDate: '',
+        message: 'not ready',
+        raw: {},
+      });
+
+      await expect(service.syncOrder(10)).resolves.toEqual({
+        orderStatus: 'PENDING',
+      });
+
+      expect(prismaMock.$transaction).not.toHaveBeenCalled();
+      expect(prismaMock.payment.updateMany).not.toHaveBeenCalled();
+      expect(prismaMock.order.updateMany).not.toHaveBeenCalled();
+      expect(prismaMock.user.update).not.toHaveBeenCalled();
+    },
+  );
+
+  it('syncOrder querydr 00 + 02: Payment FAILED, đơn PAYMENT_FAILED', async () => {
+    prismaMock.order.findUnique
+      .mockResolvedValueOnce({ id: 10, status: 'PENDING' })
+      .mockResolvedValueOnce({ id: 10, status: 'PENDING', userId: 7 })
+      .mockResolvedValueOnce({ status: 'PAYMENT_FAILED' });
+    prismaMock.payment.findFirst.mockResolvedValue(
+      payment({ status: 'PENDING' }),
+    );
+    prismaMock.payment.findUnique.mockResolvedValue({
+      id: 1,
+      orderId: 10,
+      status: 'PENDING',
+      amount: 50000,
+    });
+    vnpayMock.queryTransaction.mockResolvedValue({
+      responseCode: '00',
+      transactionStatus: '02',
+      transactionNo: '',
+      payDate: '',
+      message: 'failed',
+      raw: {},
+    });
+
+    await expect(service.syncOrder(10)).resolves.toEqual({
+      orderStatus: 'PAYMENT_FAILED',
+    });
+
+    expect(prismaMock.payment.updateMany).toHaveBeenCalledWith({
+      where: { id: 1, status: 'PENDING' },
+      data: { status: 'FAILED' },
+    });
+    expect(prismaMock.order.updateMany).toHaveBeenCalledWith({
+      where: { id: 10, status: 'PENDING' },
+      data: { status: 'PAYMENT_FAILED' },
+    });
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+  });
+
   it('syncForUser: đơn của người khác báo NotFound', async () => {
     prismaMock.order.findFirst.mockResolvedValue(null);
 
@@ -719,11 +834,54 @@ describe('PaymentsService', () => {
       transactionDate: createdAt,
       ipAddr: '1.2.3.4',
     });
-    expect(applySpy).toHaveBeenCalledWith(payment(), expect.anything());
+    expect(applySpy).toHaveBeenCalledWith(
+      payment(),
+      expect.anything(),
+      'SUCCESS',
+    );
     expect(result).toEqual({
       orderId: 10,
       orderStatus: 'PAID',
       success: true,
+    });
+  });
+
+  it('handleReturn querydr 00 + 01 nhưng khách hủy: applyResult FAILED', async () => {
+    prismaMock.payment.findUnique.mockResolvedValue(payment());
+    vnpayMock.queryTransaction.mockResolvedValue({
+      responseCode: '00',
+      transactionStatus: '01',
+      transactionNo: '',
+      payDate: '',
+      message: 'pending',
+      raw: {},
+    });
+    const applySpy = jest.spyOn(service, 'applyResult').mockResolvedValue({
+      orderId: 10,
+      orderStatus: 'PAYMENT_FAILED',
+      success: false,
+    });
+
+    const result = await service.handleReturn(
+      {
+        vnp_TxnRef: 'BL7K2M9QX4P2AB',
+        vnp_ResponseCode: '24',
+      },
+      '1.2.3.4',
+    );
+
+    expect(applySpy).toHaveBeenCalledWith(
+      payment(),
+      expect.objectContaining({
+        responseCode: '00',
+        transactionStatus: '01',
+      }),
+      'FAILED',
+    );
+    expect(result).toEqual({
+      orderId: 10,
+      orderStatus: 'PAYMENT_FAILED',
+      success: false,
     });
   });
 
@@ -787,11 +945,46 @@ describe('PaymentsService', () => {
       RspCode: '00',
       Message: 'Confirm Success',
     });
-    expect(applySpy).toHaveBeenCalledWith(payment(), {
-      responseCode: '00',
-      transactionStatus: '00',
-      transactionNo: 'VNP123',
-      payDate: '20261027230000',
+    expect(applySpy).toHaveBeenCalledWith(
+      payment(),
+      {
+        responseCode: '00',
+        transactionStatus: '00',
+        transactionNo: 'VNP123',
+        payDate: '20261027230000',
+      },
+      'SUCCESS',
+    );
+  });
+
+  it('handleIpn khách hủy: applyResult FAILED và vẫn trả 00', async () => {
+    prismaMock.payment.findUnique.mockResolvedValue(payment());
+    const applySpy = jest.spyOn(service, 'applyResult').mockResolvedValue({
+      orderId: 10,
+      orderStatus: 'PAYMENT_FAILED',
+      success: false,
     });
+
+    await expect(
+      service.handleIpn({
+        vnp_TxnRef: 'BL7K2M9QX4P2AB',
+        vnp_Amount: '5000000',
+        vnp_ResponseCode: '24',
+        vnp_TransactionStatus: '',
+        vnp_TransactionNo: '',
+        vnp_PayDate: '',
+      }),
+    ).resolves.toEqual({
+      RspCode: '00',
+      Message: 'Confirm Success',
+    });
+    expect(applySpy).toHaveBeenCalledWith(
+      payment(),
+      expect.objectContaining({
+        responseCode: '24',
+        transactionStatus: '',
+      }),
+      'FAILED',
+    );
   });
 });

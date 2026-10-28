@@ -1,3 +1,4 @@
+import { ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac } from 'node:crypto';
 import { formatVnpayDate, VnpayClient } from './vnpay.client';
@@ -6,8 +7,7 @@ const configValues: Record<string, string> = {
   VNP_TMN_CODE: 'TESTTMN',
   VNP_HASH_SECRET: 'secret',
   VNP_PAY_URL: 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html',
-  VNP_API_URL:
-    'https://sandbox.vnpayment.vn/merchant_webapi/api/transaction',
+  VNP_API_URL: 'https://sandbox.vnpayment.vn/merchant_webapi/api/transaction',
   VNP_RETURN_URL: 'http://localhost:3000/payment/result',
 };
 
@@ -40,12 +40,14 @@ describe('VnpayClient', () => {
   });
 
   it('tạo link thanh toán rồi verifyReturn lại đúng', () => {
+    const createDate = new Date('2026-10-27T15:00:00.000Z');
     const expiresAt = new Date('2026-10-27T16:00:00.000Z');
     const payUrl = client.buildPayUrl({
       txnRef: 'BL7K2M9QX4P2AB',
       amount: 50000,
       orderInfo: 'Thanh toan don BL-7K2M9Q',
       ipAddr: '127.0.0.1',
+      createDate,
       expiresAt,
       bankCode: 'VNBANK',
     });
@@ -59,13 +61,16 @@ describe('VnpayClient', () => {
     );
     expect(parsed.searchParams.get('vnp_BankCode')).toBe('VNBANK');
     expect(parsed.searchParams.get('vnp_ExpireDate')).toBe('20261027230000');
-    expect(parsed.searchParams.get('vnp_CreateDate')).toMatch(/^\d{14}$/);
-    expect(parsed.searchParams.get('vnp_SecureHash')).toMatch(/^[a-f0-9]{128}$/);
+    expect(parsed.searchParams.get('vnp_CreateDate')).toBe(
+      formatVnpayDate(createDate),
+    );
+    expect(parsed.searchParams.get('vnp_CreateDate')).toBe('20261027220000');
+    expect(parsed.searchParams.get('vnp_SecureHash')).toMatch(
+      /^[a-f0-9]{128}$/,
+    );
     expect(client.verifyReturn(query)).toBe(true);
 
-    expect(
-      client.verifyReturn({ ...query, vnp_Amount: '1' }),
-    ).toBe(false);
+    expect(client.verifyReturn({ ...query, vnp_Amount: '1' })).toBe(false);
   });
 
   it('querydr: đúng body và chữ ký', async () => {
@@ -168,6 +173,33 @@ describe('VnpayClient', () => {
       body.vnp_OrderInfo,
     ].join('|');
     expect(body.vnp_SecureHash).toBe(hmac(signData));
+  });
+
+  it('thiếu khoá VNPay: constructor vẫn chạy, gọi VNPay mới báo 503', async () => {
+    const emptyConfig = {
+      get: jest.fn(),
+    } as unknown as ConfigService;
+
+    expect(() => new VnpayClient(emptyConfig)).not.toThrow();
+    const emptyClient = new VnpayClient(emptyConfig);
+
+    expect(() =>
+      emptyClient.buildPayUrl({
+        txnRef: 'BL7K2M9QX4P2AB',
+        amount: 50000,
+        orderInfo: 'Thanh toan don BL-7K2M9Q',
+        ipAddr: '127.0.0.1',
+        createDate: new Date('2026-10-27T15:00:00.000Z'),
+        expiresAt: new Date('2026-10-27T16:00:00.000Z'),
+      }),
+    ).toThrow(ServiceUnavailableException);
+
+    await expect(
+      emptyClient.queryTransaction({
+        txnRef: 'BL7K2M9QX4P2AB',
+        transactionDate: '20261027220000',
+      }),
+    ).rejects.toThrow(ServiceUnavailableException);
   });
 
   it('format ngày VNPay theo GMT+7', () => {
