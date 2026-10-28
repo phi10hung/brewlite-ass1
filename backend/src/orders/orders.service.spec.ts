@@ -414,3 +414,45 @@ describe('OrdersService - thử lại khi xung đột version', () => {
     expect(fake.order.create).not.toHaveBeenCalled();
   });
 });
+
+describe('OrdersService - đặt đơn mới hủy đơn chờ cũ', () => {
+  it('hủy các đơn chờ thanh toán cũ của khách trước khi tạo đơn mới', async () => {
+    const { service, fake } = setup();
+    fake.order.findMany.mockResolvedValue([{ id: 11 }, { id: 12 }]);
+    const cancel = jest.spyOn(service, 'cancel').mockResolvedValue(null);
+
+    await service.create(7, makeDto(latteM()));
+
+    expect(fake.order.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ userId: 7 }),
+      }),
+    );
+    expect(cancel).toHaveBeenCalledWith(11, 'SYSTEM');
+    expect(cancel).toHaveBeenCalledWith(12, 'SYSTEM');
+    expect(fake.order.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('đơn cũ vừa thanh toán xong (409) thì giữ nguyên, vẫn tạo đơn mới', async () => {
+    const { service, fake } = setup();
+    fake.order.findMany.mockResolvedValue([{ id: 11 }]);
+    jest.spyOn(service, 'cancel').mockRejectedValue(new ConflictException());
+
+    await service.create(7, makeDto(latteM()));
+
+    expect(fake.order.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('đơn mới không hợp lệ thì không đụng đơn cũ', async () => {
+    const { service, fake } = setup();
+    fake.order.findMany.mockResolvedValue([{ id: 11 }]);
+    const cancel = jest.spyOn(service, 'cancel').mockResolvedValue(null);
+    fake.product.findMany.mockResolvedValue([]); // món không tồn tại
+
+    await expect(service.create(7, makeDto(latteM()))).rejects.toThrow(
+      BadRequestException,
+    );
+
+    expect(cancel).not.toHaveBeenCalled();
+  });
+});

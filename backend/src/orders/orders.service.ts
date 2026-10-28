@@ -193,6 +193,23 @@ export class OrdersService {
 
     const expiresAt = new Date(Date.now() + paymentMinutes() * 60_000);
 
+        // Mỗi khách chỉ giữ 1 đơn chờ thanh toán: đặt đơn mới thì hủy đơn chờ cũ, trả nguyên liệu
+    const waiting = await this.prisma.order.findMany({
+      where: {
+        userId,
+        status: { in: [OrderStatus.PENDING, OrderStatus.PAYMENT_FAILED] },
+      },
+      select: { id: true },
+    });
+    for (const old of waiting) {
+      try {
+        await this.cancel(old.id, 'SYSTEM');
+      } catch (error) {
+        // Đơn cũ vừa được thanh toán xong (409) thì giữ nguyên, không chặn đơn mới
+        if (!(error instanceof ConflictException)) throw error;
+      }
+    }
+
     for (let attempt = 1; ; attempt++) {
       try {
         return await this.prisma.$transaction(async (tx) => {
