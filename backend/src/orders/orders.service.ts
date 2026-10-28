@@ -5,6 +5,8 @@ import { SIZE_EXTRA } from '../common/pricing';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { PromotionsService } from '../promotions/promotions.service';
 import { groupBy, ingredientsForLine, maxCups, type RecipeLine } from '../common/recipe';
+import { OrderStatus, PaymentStatus } from '../generated/prisma/enums';
+import type { RefundStatus } from '../generated/prisma/enums';
 
 // Bỏ các ký tự dễ nhầm (0/O, 1/I) để khách đọc mã đơn không bị sai
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -26,6 +28,47 @@ const MAX_ATTEMPTS = 10;
 // Chờ ngẫu nhiên trước khi thử lại để các đơn không đụng nhau ở vòng sau
 const waitBeforeRetry = (attempt: number) =>
   new Promise((resolve) => setTimeout(resolve, Math.random() * 20 * attempt));
+
+// Lấy trạng thái hoàn tiền từ lần thanh toán thành công gần nhất của đơn
+const SUCCESS_PAYMENT = {
+  where: { status: PaymentStatus.SUCCESS },
+  orderBy: { createdAt: 'desc' },
+  take: 1,
+  select: { refundStatus: true },
+} as const;
+
+const ORDER_DETAIL_SELECT = {
+  id: true,
+  code: true,
+  status: true,
+  subtotal: true,
+  discount: true,
+  total: true,
+  promotionCode: true,
+  paymentMethod: true,
+  expiresAt: true,
+  createdAt: true,
+  items: {
+    orderBy: { id: 'asc' },
+    select: {
+      productName: true,
+      size: true,
+      toppings: true,
+      quantity: true,
+      unitPrice: true,
+      lineTotal: true,
+    },
+  },
+  payments: SUCCESS_PAYMENT,
+} as const;
+
+// Đổi mảng payments thành 1 trường refundStatus cho frontend dễ dùng
+function withRefundStatus<
+  T extends { payments: { refundStatus: RefundStatus | null }[] },
+>(order: T) {
+  const { payments, ...rest } = order;
+  return { ...rest, refundStatus: payments[0]?.refundStatus ?? null };
+}
 
 // Hạn thanh toán của đơn, mặc định 5 phút
 const paymentMinutes = () => Number(process.env.ORDER_PAYMENT_MINUTES) || 5;
@@ -245,8 +288,8 @@ export class OrdersService {
       }
     }
   }
-    findMine(userId: number) {
-    return this.prisma.order.findMany({
+    async findMine(userId: number) {
+    const orders = await this.prisma.order.findMany({
       where: { userId },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       select: {
@@ -254,6 +297,8 @@ export class OrdersService {
         code: true,
         status: true,
         total: true,
+        paymentMethod: true,
+        expiresAt: true,
         createdAt: true,
         items: {
           orderBy: { id: 'asc' },
@@ -265,39 +310,21 @@ export class OrdersService {
             lineTotal: true,
           },
         },
+        payments: SUCCESS_PAYMENT,
       },
     });
+    return orders.map(withRefundStatus);
   }
 
   async findOne(userId: number, id: number) {
     // Lọc luôn theo userId: đơn không tồn tại hoặc của người khác đều ra null
     const order = await this.prisma.order.findFirst({
       where: { id, userId },
-      select: {
-        id: true,
-        code: true,
-        status: true,
-        subtotal: true,
-        discount: true,
-        total: true,
-        promotionCode: true,
-        createdAt: true,
-        items: {
-          orderBy: { id: 'asc' },
-          select: {
-            productName: true,
-            size: true,
-            toppings: true,
-            quantity: true,
-            unitPrice: true,
-            lineTotal: true,
-          },
-        },
-      },
+      select: ORDER_DETAIL_SELECT,
     });
     if (!order) {
       throw new NotFoundException('Không tìm thấy đơn hàng');
     }
-    return order;
+    return withRefundStatus(order);
   }
 }
