@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SIZE_EXTRA } from '../common/pricing';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { PromotionsService } from '../promotions/promotions.service';
+import { ingredientsForLine, maxCups, type RecipeLine } from '../common/recipe';
 
 // Bỏ các ký tự dễ nhầm (0/O, 1/I) để khách đọc mã đơn không bị sai
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -26,6 +27,19 @@ const MAX_ATTEMPTS = 10;
 const waitBeforeRetry = (attempt: number) =>
   new Promise((resolve) => setTimeout(resolve, Math.random() * 20 * attempt));
 
+// Hạn thanh toán của đơn, mặc định 5 phút
+const paymentMinutes = () => Number(process.env.ORDER_PAYMENT_MINUTES) || 5;
+
+function groupBy<T, K>(rows: T[], key: (row: T) => K): Map<K, T[]> {
+  const map = new Map<K, T[]>();
+  for (const row of rows) {
+    const list = map.get(key(row)) ?? [];
+    list.push(row);
+    map.set(key(row), list);
+  }
+  return map;
+}
+
 @Injectable()
 export class OrdersService {
   constructor(
@@ -33,23 +47,34 @@ export class OrdersService {
     private readonly promotions: PromotionsService,
   ) {}
 
-  async create(userId: number, dto: CreateOrderDto) {
+    async create(userId: number, dto: CreateOrderDto) {
     const productIds = [...new Set(dto.items.map((i) => i.productId))];
     const toppingIds = [...new Set(dto.items.flatMap((i) => i.toppingIds))];
 
-    // Giá luôn lấy từ database, không tin giá client gửi
-    const [products, toppings] = await Promise.all([
-      this.prisma.product.findMany({
-        where: { id: { in: productIds } },
-        select: { id: true, name: true, price: true },
-      }),
-      this.prisma.topping.findMany({
-        where: { id: { in: toppingIds } },
-        select: { id: true, name: true, price: true },
-      }),
-    ]);
+    // Giá và công thức luôn lấy từ database, không tin dữ liệu client gửi
+    const [products, toppings, recipeRows, toppingRecipeRows] =
+      await Promise.all([
+        this.prisma.product.findMany({
+          where: { id: { in: productIds } },
+          select: { id: true, name: true, price: true },
+        }),
+        this.prisma.topping.findMany({
+          where: { id: { in: toppingIds } },
+          select: { id: true, name: true, price: true },
+        }),
+        this.prisma.recipe.findMany({
+          where: { productId: { in: productIds } },
+          select: { productId: true, ingredientId: true, amount: true },
+        }),
+        this.prisma.toppingRecipe.findMany({
+          where: { toppingId: { in: toppingIds } },
+          select: { toppingId: true, ingredientId: true, amount: true },
+        }),
+      ]);
     const productMap = new Map(products.map((p) => [p.id, p]));
     const toppingMap = new Map(toppings.map((t) => [t.id, t]));
+    const recipesByProduct = groupBy(recipeRows, (r) => r.productId);
+    const recipesByTopping = groupBy(toppingRecipeRows, (r) => r.toppingId);
 
     const lines = dto.items.map((item) => {
       const product = productMap.get(item.productId);
@@ -89,46 +114,91 @@ export class OrdersService {
     const discount = promotion?.discount ?? 0;
     const total = subtotal - discount;
 
-    // Tạo Order và OrderItem trong một lần ghi: nếu một món lỗi thì cả đơn bị huỷ
-    
-    // Gộp số lượng theo món: giỏ có thể có cùng 1 món ở nhiều dòng (khác size/topping)
-    const needed = new Map<number, { name: string; qty: number }>();
-    for (const line of lines) {
-      const cur = needed.get(line.productId);
-      needed.set(line.productId, {
-        name: line.productName,
-        qty: (cur?.qty ?? 0) + line.quantity,
-      });
-    }
+    // Nguyên liệu cần cho `qty` ly của dòng thứ i trong giỏ (món × size + topping)
+    const needsOf = (i: number, qty: number) => {
+      const item = dto.items[i];
+      const toppingRecipes: RecipeLine[][] = [...new Set(item.toppingIds)].map(
+        (id) => recipesByTopping.get(id) ?? [],
+      );
+      return ingredientsForLine(
+        recipesByProduct.get(item.productId) ?? [],
+        toppingRecipes,
+        item.size,
+        qty,
+      );
+    };
 
-        // Sắp xếp theo productId để các đơn đồng thời khoá món theo cùng thứ tự
+    // Cộng dồn nguyên liệu của cả giỏ: ingredientId -> tổng lượng cần
+    const needed = new Map<number, number>();
+    for (let i = 0; i < lines.length; i++) {
+      const perLine = needsOf(i, lines[i].quantity);
+      if (perLine.size === 0) {
+        throw new BadRequestException(
+          `Món ${lines[i].productName} chưa có công thức pha chế`,
+        );
+      }
+      for (const [ingredientId, amount] of perLine) {
+        needed.set(ingredientId, (needed.get(ingredientId) ?? 0) + amount);
+      }
+    }
+    // Sắp xếp theo ingredientId để các đơn đồng thời xử lý nguyên liệu cùng thứ tự
     const entries = [...needed.entries()].sort((a, b) => a[0] - b[0]);
+
+    // Tìm dòng giỏ có dùng nguyên liệu này, để báo lỗi đúng tên món
+    const lineUsing = (ingredientId: number) => {
+      for (let i = 0; i < lines.length; i++) {
+        if (needsOf(i, 1).has(ingredientId)) return i;
+      }
+      return 0;
+    };
+
+    const expiresAt = new Date(Date.now() + paymentMinutes() * 60_000);
 
     for (let attempt = 1; ; attempt++) {
       try {
         return await this.prisma.$transaction(async (tx) => {
-          for (const [productId, { name, qty }] of entries) {
-            // 1. Đọc tồn kho + version hiện tại
-            const p = await tx.product.findUnique({
-              where: { id: productId },
+          // 1. Đọc tồn kho + version hiện tại của mọi nguyên liệu cần dùng
+          const stock = new Map<number, number>();
+          const versions = new Map<number, number>();
+          for (const [ingredientId] of entries) {
+            const ing = await tx.ingredient.findUnique({
+              where: { id: ingredientId },
               select: { stock: true, version: true },
             });
-            if (!p || p.stock < qty) {
+            if (!ing) {
               throw new BadRequestException(
-                `Món ${name} chỉ còn ${p?.stock ?? 0} ly`,
+                `Nguyên liệu #${ingredientId} không tồn tại`,
               );
             }
+            stock.set(ingredientId, ing.stock);
+            versions.set(ingredientId, ing.version);
+          }
 
-            // 2. Trừ kho chỉ khi version chưa đổi (optimistic locking)
-            const result = await tx.product.updateMany({
-              where: { id: productId, version: p.version },
-              data: { stock: { decrement: qty }, version: { increment: 1 } },
+          // 2. Thiếu nguyên liệu nào thì báo lỗi, chưa trừ gì
+          for (const [ingredientId, amount] of entries) {
+            if ((stock.get(ingredientId) ?? 0) >= amount) continue;
+            const i = lineUsing(ingredientId);
+            const cups = maxCups(stock, needsOf(i, 1));
+            throw new BadRequestException(
+              `Món ${lines[i].productName} không đủ nguyên liệu, chỉ còn pha được ${cups} ly`,
+            );
+          }
+
+          // 3. Trừ kho chỉ khi version chưa đổi (optimistic locking)
+          for (const [ingredientId, amount] of entries) {
+            const result = await tx.ingredient.updateMany({
+              where: { id: ingredientId, version: versions.get(ingredientId) },
+              data: {
+                stock: { decrement: amount },
+                version: { increment: 1 },
+              },
             });
             if (result.count === 0) {
               throw new StockConflictError();
             }
           }
 
+          // 4. Tạo đơn, ghi lại lượng nguyên liệu đã trừ để hủy đơn thì trả đúng
           return tx.order.create({
             data: {
               code: generateOrderCode(),
@@ -137,8 +207,16 @@ export class OrdersService {
               discount,
               total,
               promotionCode: promotion?.code ?? null,
+              paymentMethod: dto.paymentMethod,
+              expiresAt,
               userId,
               items: { create: lines },
+              ingredients: {
+                create: entries.map(([ingredientId, amount]) => ({
+                  ingredientId,
+                  amount,
+                })),
+              },
             },
             select: {
               id: true,
@@ -148,6 +226,8 @@ export class OrdersService {
               discount: true,
               total: true,
               promotionCode: true,
+              paymentMethod: true,
+              expiresAt: true,
               items: {
                 select: {
                   productId: true,

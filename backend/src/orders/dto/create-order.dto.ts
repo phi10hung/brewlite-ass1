@@ -6,7 +6,6 @@ import {
   IsInt,
   IsOptional,
   IsString,
-  Max,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -26,7 +25,6 @@ export class OrderItemDto {
 
   @IsInt({ message: 'Số lượng phải là số nguyên' })
   @Min(1, { message: 'Số lượng tối thiểu là 1' })
-  @Max(20, { message: 'Số lượng tối đa là 20' })
   quantity!: number;
 }
 
@@ -36,6 +34,11 @@ export class CreateOrderDto {
   @ValidateNested({ each: true })
   @Type(() => OrderItemDto)
   items!: OrderItemDto[];
+
+  @IsIn(['WALLET', 'CARD'], {
+    message: 'Phương thức thanh toán phải là WALLET hoặc CARD',
+  })
+  paymentMethod!: 'WALLET' | 'CARD';
 
   @IsOptional()
   @IsString({ message: 'Mã giảm giá phải là chuỗi' })
