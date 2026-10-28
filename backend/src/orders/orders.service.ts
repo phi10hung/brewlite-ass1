@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SIZE_EXTRA } from '../common/pricing';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { PromotionsService } from '../promotions/promotions.service';
-import { ingredientsForLine, maxCups, type RecipeLine } from '../common/recipe';
+import { groupBy, ingredientsForLine, maxCups, type RecipeLine } from '../common/recipe';
 
 // Bỏ các ký tự dễ nhầm (0/O, 1/I) để khách đọc mã đơn không bị sai
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -30,15 +30,6 @@ const waitBeforeRetry = (attempt: number) =>
 // Hạn thanh toán của đơn, mặc định 5 phút
 const paymentMinutes = () => Number(process.env.ORDER_PAYMENT_MINUTES) || 5;
 
-function groupBy<T, K>(rows: T[], key: (row: T) => K): Map<K, T[]> {
-  const map = new Map<K, T[]>();
-  for (const row of rows) {
-    const list = map.get(key(row)) ?? [];
-    list.push(row);
-    map.set(key(row), list);
-  }
-  return map;
-}
 
 @Injectable()
 export class OrdersService {

@@ -47,3 +47,14 @@ export function maxCups(
   }
   return Number.isFinite(max) ? max : 0;
 }
+
+// Gom các dòng theo khoá, ví dụ gom công thức theo productId
+export function groupBy<T, K>(rows: T[], key: (row: T) => K): Map<K, T[]> {
+  const map = new Map<K, T[]>();
+  for (const row of rows) {
+    const list = map.get(key(row)) ?? [];
+    list.push(row);
+    map.set(key(row), list);
+  }
+  return map;
+}
