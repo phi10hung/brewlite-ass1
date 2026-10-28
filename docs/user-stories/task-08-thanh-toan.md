@@ -15,3 +15,5 @@ Là **khách hàng đã đăng nhập**, tôi muốn thanh toán đơn hàng b�
 - [x] Khách trả xong nhưng đơn đã bị hủy (quá hạn) → tự hoàn tiền
 - [x] Việc đổi trạng thái đơn dùng `assertTransition` của Task 10a; trạng thái không hợp lệ bị chặn với lỗi 400
 - [x] Có unit test cho thanh toán thành công và thanh toán thất bại
+- [x] Khách đang thanh toán trên VNPay (chưa có kết quả) thì đơn giữ nguyên "Chờ thanh toán", hệ thống hỏi lại sau
+- [x] Backend vẫn chạy khi chưa cấu hình khoá VNPay; chỉ chức năng thanh toán báo "Chưa cấu hình thanh toán VNPay"
