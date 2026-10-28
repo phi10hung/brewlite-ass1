@@ -1,10 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {
-  createHmac,
-  randomBytes,
-  timingSafeEqual,
-} from 'node:crypto';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 type VnpayParams = Record<string, string>;
 
@@ -136,38 +132,35 @@ export function formatVnpayDate(date: Date): string {
   ].join('');
 }
 
+type VnpaySettings = {
+  tmnCode: string;
+  hashSecret: string;
+  payUrl: string;
+  apiUrl: string;
+  returnUrl: string;
+};
+
 @Injectable()
 export class VnpayClient {
-  private readonly tmnCode: string;
-  private readonly hashSecret: string;
-  private readonly payUrl: string;
-  private readonly apiUrl: string;
-  private readonly returnUrl: string;
-
-  constructor(config: ConfigService) {
-    this.tmnCode = this.required(config, 'VNP_TMN_CODE');
-    this.hashSecret = this.required(config, 'VNP_HASH_SECRET');
-    this.payUrl = this.required(config, 'VNP_PAY_URL').replace(/\/+$/, '');
-    this.apiUrl = this.required(config, 'VNP_API_URL').replace(/\/+$/, '');
-    this.returnUrl = this.required(config, 'VNP_RETURN_URL');
-  }
+  constructor(private readonly config: ConfigService) {}
 
   buildPayUrl(input: BuildPayUrlInput): string {
     this.assertTxnRef(input.txnRef);
     this.assertAmount(input.amount);
     this.assertOrderInfo(input.orderInfo);
 
+    const settings = this.settings();
     const params: VnpayParams = {
       vnp_Version: '2.1.0',
       vnp_Command: 'pay',
-      vnp_TmnCode: this.tmnCode,
+      vnp_TmnCode: settings.tmnCode,
       vnp_Locale: 'vn',
       vnp_CurrCode: 'VND',
       vnp_TxnRef: input.txnRef,
       vnp_OrderInfo: input.orderInfo,
       vnp_OrderType: 'other',
       vnp_Amount: String(Math.round(input.amount * 100)),
-      vnp_ReturnUrl: this.returnUrl,
+      vnp_ReturnUrl: settings.returnUrl,
       vnp_IpAddr: normalizeIpAddress(input.ipAddr),
       vnp_CreateDate: formatVnpayDate(input.createDate),
       vnp_ExpireDate: formatVnpayDate(input.expiresAt),
@@ -178,13 +171,14 @@ export class VnpayClient {
     }
 
     const signData = toQueryString(sortObject(params));
-    const secureHash = this.hmacSha512(signData);
-    const separator = this.payUrl.includes('?') ? '&' : '?';
+    const secureHash = this.hmacSha512(signData, settings.hashSecret);
+    const separator = settings.payUrl.includes('?') ? '&' : '?';
 
-    return `${this.payUrl}${separator}${signData}&vnp_SecureHash=${secureHash}`;
+    return `${settings.payUrl}${separator}${signData}&vnp_SecureHash=${secureHash}`;
   }
 
   verifyReturn(query: Record<string, unknown>): boolean {
+    const settings = this.settings();
     const params = normalizeQuery(query);
     const secureHash = params.vnp_SecureHash;
 
@@ -194,7 +188,7 @@ export class VnpayClient {
     delete params.vnp_SecureHashType;
 
     const signData = toQueryString(sortObject(params));
-    const expected = this.hmacSha512(signData);
+    const expected = this.hmacSha512(signData, settings.hashSecret);
 
     return safeEqual(expected, secureHash);
   }
@@ -204,6 +198,7 @@ export class VnpayClient {
   ): Promise<QueryTransactionResult> {
     this.assertTxnRef(input.txnRef);
 
+    const settings = this.settings();
     const requestId = this.createRequestId();
     const transactionDate = normalizeTransactionDate(input.transactionDate);
     const createDate = formatVnpayDate(new Date());
@@ -215,7 +210,7 @@ export class VnpayClient {
       requestId,
       '2.1.0',
       'querydr',
-      this.tmnCode,
+      settings.tmnCode,
       input.txnRef,
       transactionDate,
       createDate,
@@ -227,16 +222,16 @@ export class VnpayClient {
       vnp_RequestId: requestId,
       vnp_Version: '2.1.0',
       vnp_Command: 'querydr',
-      vnp_TmnCode: this.tmnCode,
+      vnp_TmnCode: settings.tmnCode,
       vnp_TxnRef: input.txnRef,
       vnp_OrderInfo: orderInfo,
       vnp_TransactionDate: transactionDate,
       vnp_CreateDate: createDate,
       vnp_IpAddr: ipAddr,
-      vnp_SecureHash: this.hmacSha512(signData),
+      vnp_SecureHash: this.hmacSha512(signData, settings.hashSecret),
     };
 
-    const data = await this.postToVnpay(payload);
+    const data = await this.postToVnpay(settings.apiUrl, payload);
 
     return {
       responseCode: asString(data.vnp_ResponseCode),
@@ -258,6 +253,7 @@ export class VnpayClient {
       throw new Error('Thiếu mã giao dịch VNPay để hoàn tiền');
     }
 
+    const settings = this.settings();
     const requestId = this.createRequestId();
     const transactionDate = normalizeTransactionDate(input.transactionDate);
     const createDate = formatVnpayDate(new Date());
@@ -270,7 +266,7 @@ export class VnpayClient {
       requestId,
       '2.1.0',
       'refund',
-      this.tmnCode,
+      settings.tmnCode,
       '02',
       input.txnRef,
       amount,
@@ -286,7 +282,7 @@ export class VnpayClient {
       vnp_RequestId: requestId,
       vnp_Version: '2.1.0',
       vnp_Command: 'refund',
-      vnp_TmnCode: this.tmnCode,
+      vnp_TmnCode: settings.tmnCode,
       vnp_TransactionType: '02',
       vnp_TxnRef: input.txnRef,
       vnp_Amount: amount,
@@ -296,10 +292,10 @@ export class VnpayClient {
       vnp_CreateBy: input.createBy,
       vnp_CreateDate: createDate,
       vnp_IpAddr: ipAddr,
-      vnp_SecureHash: this.hmacSha512(signData),
+      vnp_SecureHash: this.hmacSha512(signData, settings.hashSecret),
     };
 
-    const data = await this.postToVnpay(payload);
+    const data = await this.postToVnpay(settings.apiUrl, payload);
 
     return {
       responseCode: asString(data.vnp_ResponseCode),
@@ -309,9 +305,10 @@ export class VnpayClient {
   }
 
   private async postToVnpay(
+    apiUrl: string,
     payload: Record<string, string>,
   ): Promise<Record<string, unknown>> {
-    const response = await fetch(this.apiUrl, {
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -330,8 +327,8 @@ export class VnpayClient {
     return data as Record<string, unknown>;
   }
 
-  private hmacSha512(data: string): string {
-    return createHmac('sha512', this.hashSecret).update(data, 'utf8').digest('hex');
+  private hmacSha512(data: string, hashSecret: string): string {
+    return createHmac('sha512', hashSecret).update(data, 'utf8').digest('hex');
   }
 
   private createRequestId(): string {
@@ -362,10 +359,20 @@ export class VnpayClient {
     }
   }
 
-  private required(config: ConfigService, key: string): string {
-    const value = config.get<string>(key)?.trim();
+  private settings(): VnpaySettings {
+    return {
+      tmnCode: this.required('VNP_TMN_CODE'),
+      hashSecret: this.required('VNP_HASH_SECRET'),
+      payUrl: this.required('VNP_PAY_URL').replace(/\/+$/, ''),
+      apiUrl: this.required('VNP_API_URL').replace(/\/+$/, ''),
+      returnUrl: this.required('VNP_RETURN_URL'),
+    };
+  }
+
+  private required(key: string): string {
+    const value = this.config.get<string>(key)?.trim();
     if (!value) {
-      throw new Error(`Thiếu biến môi trường ${key}`);
+      throw new ServiceUnavailableException('Chưa cấu hình thanh toán VNPay');
     }
     return value;
   }
