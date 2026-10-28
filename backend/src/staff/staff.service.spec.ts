@@ -93,3 +93,24 @@ describe('StaffService.updateStatus', () => {
     expect(cancel).not.toHaveBeenCalled();
   });
 });
+describe('StaffService.listIngredients', () => {
+  it('trả id, tên, đơn vị, tồn kho và sắp theo tên', async () => {
+    const rows = [
+      { id: 1, name: 'Cà phê', unit: 'g', stock: 0 },
+      { id: 2, name: 'Sữa', unit: 'ml', stock: 5000 },
+    ];
+    const ingredientFindMany = jest.fn().mockResolvedValue(rows);
+    const prisma = {
+      ingredient: { findMany: ingredientFindMany },
+    } as unknown as PrismaService;
+    const service = new StaffService(prisma, {} as unknown as OrdersService);
+
+    const result = await service.listIngredients();
+
+    expect(ingredientFindMany).toHaveBeenCalledWith({
+      select: { id: true, name: true, unit: true, stock: true },
+      orderBy: { name: 'asc' },
+    });
+    expect(result).toEqual(rows);
+  });
+});

@@ -37,7 +37,14 @@ export class StaffService {
       include: ORDER_INCLUDE,
     });
   }
-
+  // Kho nguyên liệu cho nhân viên xem, sắp theo tên
+  listIngredients() {
+    return this.prisma.ingredient.findMany({
+      select: { id: true, name: true, unit: true, stock: true },
+      orderBy: { name: 'asc' },
+    });
+  }
+  
   async updateStatus(id: number, status: OrderStatus) {
     const order = await this.prisma.order.findUnique({ where: { id } });
     if (!order) {
