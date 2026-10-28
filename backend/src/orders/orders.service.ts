@@ -7,6 +7,8 @@ import { PromotionsService } from '../promotions/promotions.service';
 import { groupBy, ingredientsForLine, maxCups, type RecipeLine } from '../common/recipe';
 import { OrderStatus, PaymentStatus } from '../generated/prisma/enums';
 import type { RefundStatus } from '../generated/prisma/enums';
+import { assertTransition } from './order-status';
+import { PaymentsService } from '../payments/payments.service';
 
 // Bỏ các ký tự dễ nhầm (0/O, 1/I) để khách đọc mã đơn không bị sai
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -70,6 +72,8 @@ function withRefundStatus<
   return { ...rest, refundStatus: payments[0]?.refundStatus ?? null };
 }
 
+export type CancelBy = 'CUSTOMER' | 'STAFF' | 'SYSTEM';
+
 // Hạn thanh toán của đơn, mặc định 5 phút
 const paymentMinutes = () => Number(process.env.ORDER_PAYMENT_MINUTES) || 5;
 
@@ -79,6 +83,7 @@ export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly promotions: PromotionsService,
+    private readonly payments: PaymentsService,
   ) {}
 
     async create(userId: number, dto: CreateOrderDto) {
@@ -317,6 +322,7 @@ export class OrdersService {
   }
 
   async findOne(userId: number, id: number) {
+    
     // Lọc luôn theo userId: đơn không tồn tại hoặc của người khác đều ra null
     const order = await this.prisma.order.findFirst({
       where: { id, userId },
@@ -327,4 +333,66 @@ export class OrdersService {
     }
     return withRefundStatus(order);
   }
+
+  
+
+  // Khách hủy, nhân viên hủy (Búp) và tác vụ tự hủy đơn quá hạn (Hùng) đều gọi hàm này
+  async cancel(orderId: number, by: CancelBy, userId?: number) {
+    const order = await this.prisma.order.findFirst({
+      // Khách chỉ được hủy đơn của chính mình; đơn người khác coi như không tồn tại
+      where: by === 'CUSTOMER' ? { id: orderId, userId } : { id: orderId },
+      select: { id: true, status: true },
+    });
+    if (!order) {
+      throw new NotFoundException('Không tìm thấy đơn hàng');
+    }
+
+    // Chỉ hủy từ PENDING, PAYMENT_FAILED, PAID (sơ đồ 9.1); PREPARING trở đi → 400
+    assertTransition(order.status, OrderStatus.CANCELLED);
+    const wasPaid = order.status === OrderStatus.PAID;
+
+    await this.prisma.$transaction(async (tx) => {
+      // Chỉ đổi khi trạng thái vẫn như lúc đọc: khách hủy đúng lúc nhân viên bấm
+      // "Nhận đơn" (hoặc 2 lần hủy cùng lúc) thì chỉ một bên thắng
+      const updated = await tx.order.updateMany({
+        where: { id: order.id, status: order.status },
+        data: { status: OrderStatus.CANCELLED },
+      });
+      if (updated.count === 0) {
+        throw new ConflictException(
+          'Đơn đã thay đổi trạng thái, vui lòng tải lại',
+        );
+      }
+
+      // Trả lại đúng lượng nguyên liệu đã trừ khi đặt đơn
+      const used = await tx.orderIngredient.findMany({
+        where: { orderId: order.id },
+        orderBy: { ingredientId: 'asc' },
+        select: { ingredientId: true, amount: true },
+      });
+      for (const u of used) {
+        await tx.ingredient.update({
+          where: { id: u.ingredientId },
+          // Tăng version để các đơn đang đặt dở đọc lại tồn kho mới
+          data: { stock: { increment: u.amount }, version: { increment: 1 } },
+        });
+      }
+
+      if (wasPaid) {
+        await this.payments.revokeLoyaltyPoints(tx, order.id);
+      }
+    });
+
+    // Hoàn tiền gọi VNPay nên để ngoài transaction; lỗi thì Triệu tự ghi "Đang hoàn tiền"
+    if (wasPaid) {
+      await this.payments.refundOrder(order.id);
+    }
+
+    const cancelled = await this.prisma.order.findUnique({
+      where: { id: order.id },
+      select: ORDER_DETAIL_SELECT,
+    });
+    return cancelled ? withRefundStatus(cancelled) : null;
+  }
+
 }

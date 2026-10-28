@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, NotFoundException } from '@nest
 import { OrdersService, generateOrderCode } from './orders.service';
 import { PromotionsService } from '../promotions/promotions.service';
 import type { CreateOrderDto } from './dto/create-order.dto';
+import { PaymentsService } from '../payments/payments.service';
 
 // Nguyên liệu mẫu
 const CA_PHE = 1;
@@ -30,7 +31,13 @@ function setup(initialStock: Record<number, number> = DEFAULT_STOCK) {
   for (const [id, stock] of Object.entries(initialStock)) {
     ingredients.set(Number(id), { stock, version: 0 });
   }
+
   const promotions = { calculate: jest.fn() };
+
+  const paymentsMock = {
+      revokeLoyaltyPoints: jest.fn(),
+      refundOrder: jest.fn(),
+    };
 
   const fake: any = {
     product: { findMany: jest.fn().mockResolvedValue(PRODUCTS) },
@@ -53,7 +60,7 @@ function setup(initialStock: Record<number, number> = DEFAULT_STOCK) {
     },
     order: {
       create: jest.fn(async () => ({ id: 1 })),
-      findMany: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
       findFirst: jest.fn(),
     },
     // Transaction giả: nếu callback ném lỗi thì hoàn lại các lần trừ kho của chính nó
@@ -82,13 +89,13 @@ function setup(initialStock: Record<number, number> = DEFAULT_STOCK) {
     }),
   };
 
-  const service = new OrdersService(
+    const service = new OrdersService(
     fake,
     promotions as unknown as PromotionsService,
+    paymentsMock as unknown as PaymentsService,
   );
-  return { service, fake, ingredients, promotions };
+  return { service, fake, ingredients, promotions, paymentsMock };
 }
-
 const makeDto = (
   items: CreateOrderDto['items'],
   promotionCode?: string,
@@ -265,13 +272,19 @@ describe('OrdersService', () => {
     expect(generateOrderCode()).toMatch(/^BL-[A-Z2-9]{6}$/);
   });
 
-  it('lấy đơn của chính mình, mới nhất trước', async () => {
+    it('lấy đơn của chính mình, mới nhất trước', async () => {
     const { service, fake } = setup();
-    fake.order.findMany.mockResolvedValue([{ id: 2 }, { id: 1 }]);
+    fake.order.findMany.mockResolvedValue([
+      { id: 2, payments: [] },
+      { id: 1, payments: [{ refundStatus: 'SUCCESS' }] },
+    ]);
 
     const result = await service.findMine(7);
 
-    expect(result).toEqual([{ id: 2 }, { id: 1 }]);
+    expect(result).toEqual([
+      { id: 2, refundStatus: null },
+      { id: 1, refundStatus: 'SUCCESS' },
+    ]);
     expect(fake.order.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { userId: 7 },
@@ -282,17 +295,21 @@ describe('OrdersService', () => {
 
   it('xem chi tiết đơn của mình', async () => {
     const { service, fake } = setup();
-    fake.order.findFirst.mockResolvedValue({ id: 5, code: 'BL-ABC234' });
+    fake.order.findFirst.mockResolvedValue({
+      id: 5,
+      code: 'BL-ABC234',
+      payments: [],
+    });
 
     await expect(service.findOne(7, 5)).resolves.toEqual({
       id: 5,
       code: 'BL-ABC234',
+      refundStatus: null,
     });
     expect(fake.order.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 5, userId: 7 } }),
     );
   });
-
   it('đơn của người khác hoặc không tồn tại thì 404', async () => {
     const { service, fake } = setup();
     fake.order.findFirst.mockResolvedValue(null);
