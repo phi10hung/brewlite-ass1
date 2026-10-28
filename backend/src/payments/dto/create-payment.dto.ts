@@ -1,4 +1,4 @@
-import { IsEnum, IsIn, IsInt, IsOptional, Min } from 'class-validator';
+import { IsEnum, IsInt, Min } from 'class-validator';
 import { PaymentMethod } from '../../generated/prisma/enums';
 
 export class CreatePaymentDto {
@@ -10,8 +10,4 @@ export class CreatePaymentDto {
     message: 'Phương thức thanh toán phải là WALLET hoặc CARD',
   })
   method!: PaymentMethod;
-
-  @IsOptional()
-  @IsIn(['fail'], { message: 'Giá trị giả lập không hợp lệ' })
-  simulate?: 'fail';
 }
