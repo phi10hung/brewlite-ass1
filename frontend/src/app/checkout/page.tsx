@@ -26,7 +26,12 @@ type PromotionResponse = {
   total: number;
 };
 
-
+type PendingOrder = {
+  id: number;
+  code?: string;
+  status: string;
+  expiresAt?: string | null;
+};
 
 function formatPrice(value: number) {
   return `${value.toLocaleString("vi-VN")}đ`;
@@ -42,6 +47,7 @@ export default function CheckoutPage() {
   const user = useAuthStore((state) => state.user);
   // Điểm thưởng: lấy số mới nhất từ GET /auth/me (số lúc đăng nhập có thể đã cũ)
   const [latestPoints, setLatestPoints] = useState<number | null>(null);
+  const [pendingOrder, setPendingOrder] = useState<PendingOrder | null>(null);
   const loyaltyPoints = latestPoints ?? user?.loyaltyPoints ?? 0;
 
   useEffect(() => {
@@ -50,6 +56,25 @@ export default function CheckoutPage() {
       .then((me) => setLatestPoints(me.loyaltyPoints))
       .catch(() => {
         // Lỗi thì giữ số điểm cũ, không chặn việc thanh toán
+      });
+  }, [token]);
+
+    useEffect(() => {
+    if (!token) return;
+    apiFetch<PendingOrder[]>("/orders/me")
+      .then((orders) => {
+        const list = Array.isArray(orders) ? orders : [];
+        const now = Date.now();
+        const found = list.find(
+          (o) =>
+            (o.status === "PENDING" || o.status === "PAYMENT_FAILED") &&
+            o.expiresAt &&
+            new Date(o.expiresAt).getTime() > now
+        );
+        setPendingOrder(found ?? null);
+      })
+      .catch(() => {
+        // Lỗi thì không hiện nhắc nhở, không chặn việc thanh toán
       });
   }, [token]);
 
@@ -224,6 +249,20 @@ export default function CheckoutPage() {
       <p className="mt-2 text-stone-500">
         Kiểm tra đơn hàng và chọn phương thức thanh toán.
       </p>
+
+            {pendingOrder && (
+        <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          Bạn đang có đơn {pendingOrder.code ?? `#${pendingOrder.id}`} chờ
+          thanh toán.{" "}
+          <Link
+            href={`/orders/${pendingOrder.id}`}
+            className="font-semibold underline"
+          >
+            Tiếp tục thanh toán
+          </Link>{" "}
+          · Đặt đơn mới sẽ tự hủy đơn cũ.
+        </div>
+      )}
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_360px]">
         {/* LEFT */}
