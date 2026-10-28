@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api';
+import { getOrderStatus } from '@/lib/order-status';
 
 type OrderStatus =
   | 'PENDING'
@@ -28,30 +29,20 @@ type StaffOrder = {
   }[];
 };
 
-const STATUS_LABEL: Record<OrderStatus, string> = {
-  PENDING: 'Chờ thanh toán',
-  PAID: 'Đã thanh toán',
-  PAYMENT_FAILED: 'Thanh toán lỗi',
-  PREPARING: 'Đang pha',
-  READY: 'Sẵn sàng',
-  COMPLETED: 'Đã giao',
-  CANCELLED: 'Đã hủy',
-};
-
 // Bước tiếp theo của nhân viên: PAID -> PREPARING -> READY -> COMPLETED
 const NEXT_STEP: Partial<Record<OrderStatus, { status: OrderStatus; label: string }>> = {
-  PAID: { status: 'PREPARING', label: 'Bắt đầu pha' },
-  PREPARING: { status: 'READY', label: 'Đã xong' },
-  READY: { status: 'COMPLETED', label: 'Hoàn thành đơn' },
+  PAID: { status: 'PREPARING', label: 'Nhận đơn' },
+  PREPARING: { status: 'READY', label: 'Pha xong' },
+  READY: { status: 'COMPLETED', label: 'Giao khách' },
 };
 
 const FILTERS: { value: string; label: string }[] = [
   { value: '', label: 'Tất cả' },
-  { value: 'PAID', label: STATUS_LABEL.PAID },
-  { value: 'PREPARING', label: STATUS_LABEL.PREPARING },
-  { value: 'READY', label: STATUS_LABEL.READY },
-  { value: 'COMPLETED', label: STATUS_LABEL.COMPLETED },
-  { value: 'CANCELLED', label: STATUS_LABEL.CANCELLED },
+  { value: 'PAID', label: getOrderStatus('PAID').label },
+  { value: 'PREPARING', label: getOrderStatus('PREPARING').label },
+  { value: 'READY', label: getOrderStatus('READY').label },
+  { value: 'COMPLETED', label: getOrderStatus('COMPLETED').label },
+  { value: 'CANCELLED', label: getOrderStatus('CANCELLED').label },
 ];
 
 function formatVnd(amount: number) {
@@ -113,39 +104,32 @@ export default function StaffPage() {
     setFilter(value);
   };
 
-  const advance = (order: StaffOrder) => {
-    const next = NEXT_STEP[order.status];
-    if (!next) return;
+  // Đổi trạng thái; lỗi (kể cả 409 đơn vừa đổi) hiện ra và tải lại danh sách cho đúng
+  const changeStatus = (order: StaffOrder, status: OrderStatus, failMessage: string) => {
     setBusyId(order.id);
     setActionError(null);
     apiFetch(`/staff/orders/${order.id}/status`, {
       method: 'PATCH',
-      body: JSON.stringify({ status: next.status }),
+      body: JSON.stringify({ status }),
     })
       .then(() => reload())
       .catch((e) => {
-        setActionError(e instanceof Error ? e.message : 'Không đổi được trạng thái');
+        setActionError(e instanceof Error ? e.message : failMessage);
+        reload();
       })
       .finally(() => setBusyId(null));
   };
 
-  // Hủy đơn: chỉ đơn Đã thanh toán (barista chưa bắt đầu pha), hỏi lại trước khi hủy
+  const advance = (order: StaffOrder) => {
+    const next = NEXT_STEP[order.status];
+    if (!next) return;
+    changeStatus(order, next.status, 'Không đổi được trạng thái');
+  };
+
+  // Hủy đơn: chỉ đơn Đã thanh toán, hỏi xác nhận trước khi hủy
   const cancelOrder = (order: StaffOrder) => {
-    const ok = window.confirm(
-      `Hủy đơn ${order.code}? Đơn đã thanh toán, nhớ hoàn tiền cho khách.`,
-    );
-    if (!ok) return;
-    setBusyId(order.id);
-    setActionError(null);
-    apiFetch(`/staff/orders/${order.id}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status: 'CANCELLED' }),
-    })
-      .then(() => reload())
-      .catch((e) => {
-        setActionError(e instanceof Error ? e.message : 'Không hủy được đơn');
-      })
-      .finally(() => setBusyId(null));
+    if (!window.confirm('Hủy đơn này? Khách sẽ được hoàn tiền.')) return;
+    changeStatus(order, 'CANCELLED', 'Không hủy được đơn');
   };
 
   if (forbidden) {
@@ -195,6 +179,7 @@ export default function StaffPage() {
         <ul className="space-y-3">
           {orders.map((o) => {
             const next = NEXT_STEP[o.status];
+            const status = getOrderStatus(o.status);
             return (
               <li key={o.id} className="rounded-lg border bg-white p-4 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -202,8 +187,8 @@ export default function StaffPage() {
                     <span className="font-semibold">{o.code}</span>
                     <span className="ml-2 text-sm text-gray-500">{formatTime(o.createdAt)}</span>
                   </div>
-                  <span className="rounded-full bg-amber-100 px-3 py-1 text-sm text-amber-800">
-                    {STATUS_LABEL[o.status]}
+                  <span className={`rounded-full px-3 py-1 text-sm ${status.className}`}>
+                    {status.label}
                   </span>
                 </div>
 
@@ -220,7 +205,7 @@ export default function StaffPage() {
 
                 <div className="mt-3 flex items-center justify-between">
                   <span className="font-semibold text-amber-700">{formatVnd(o.total)}</span>
-                                    <div className="flex gap-2">
+                  <div className="flex gap-2">
                     {o.status === 'PAID' && (
                       <button
                         onClick={() => cancelOrder(o)}
