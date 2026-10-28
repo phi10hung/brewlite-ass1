@@ -69,6 +69,25 @@ export type VnpayPaymentResult = {
   payDate: string;
 };
 
+export type ResultKind = 'SUCCESS' | 'FAILED' | 'PENDING';
+
+// querydr: ResponseCode là kết quả của câu hỏi, TransactionStatus mới là giao dịch.
+function kindFromQuery(result: VnpayPaymentResult): ResultKind {
+  if (result.responseCode !== '00') return 'PENDING';
+  if (result.transactionStatus === '00') return 'SUCCESS';
+  if (result.transactionStatus === '02') return 'FAILED';
+  return 'PENDING';
+}
+
+// Return URL/IPN: ResponseCode là kết quả thanh toán do VNPay gửi về.
+function kindFromCallback(result: VnpayPaymentResult): ResultKind {
+  if (result.responseCode === '00' && result.transactionStatus === '00') {
+    return 'SUCCESS';
+  }
+  if (result.responseCode !== '00') return 'FAILED';
+  return 'PENDING';
+}
+
 export type ApplyResult = {
   orderId: number;
   orderStatus: OrderStatus;
@@ -164,8 +183,7 @@ export class PaymentsService {
     config: ConfigService,
   ) {
     const minutes = Number(config.get<string>('ORDER_PAYMENT_MINUTES') ?? 5);
-    this.paymentMinutes =
-      Number.isFinite(minutes) && minutes > 0 ? minutes : 5;
+    this.paymentMinutes = Number.isFinite(minutes) && minutes > 0 ? minutes : 5;
   }
 
   async create(
@@ -335,7 +353,18 @@ export class PaymentsService {
       ipAddr,
     });
 
-    return this.applyResult(payment, result);
+    let kind = kindFromQuery(result);
+    const callbackResponseCode = readQueryString(query, 'vnp_ResponseCode');
+    if (
+      kind === 'PENDING' &&
+      callbackResponseCode !== undefined &&
+      callbackResponseCode !== '00'
+    ) {
+      // Khách vừa hủy trên VNPay, querydr có thể chưa kịp ghi nhận.
+      kind = 'FAILED';
+    }
+
+    return this.applyResult(payment, result, kind);
   }
 
   async handleIpn(query: Record<string, unknown>): Promise<IpnResponse> {
@@ -367,14 +396,13 @@ export class PaymentsService {
 
     const result: VnpayPaymentResult = {
       responseCode: readQueryString(query, 'vnp_ResponseCode') ?? '',
-      transactionStatus:
-        readQueryString(query, 'vnp_TransactionStatus') ?? '',
+      transactionStatus: readQueryString(query, 'vnp_TransactionStatus') ?? '',
       transactionNo: readQueryString(query, 'vnp_TransactionNo') ?? '',
       payDate: readQueryString(query, 'vnp_PayDate') ?? '',
     };
 
     try {
-      await this.applyResult(payment, result);
+      await this.applyResult(payment, result, kindFromCallback(result));
     } catch (error) {
       this.logger.warn(
         `Xử lý IPN VNPay thất bại cho ${txnRef}: ${this.errorMessage(error)}`,
@@ -423,10 +451,7 @@ export class PaymentsService {
     // VNPay giới hạn truy vấn trùng (mã 94): mỗi Payment chỉ hỏi tối đa 1 lần/5 giây.
     const now = Date.now();
     const lastQueriedAt = this.lastSyncAt.get(payment.id);
-    if (
-      lastQueriedAt !== undefined &&
-      now - lastQueriedAt < SYNC_INTERVAL_MS
-    ) {
+    if (lastQueriedAt !== undefined && now - lastQueriedAt < SYNC_INTERVAL_MS) {
       return { orderStatus: await this.currentOrderStatus(orderId) };
     }
 
@@ -436,7 +461,11 @@ export class PaymentsService {
         txnRef,
         transactionDate: payment.createdAt,
       });
-      const applied = await this.applyResult(payment, result);
+      const applied = await this.applyResult(
+        payment,
+        result,
+        kindFromQuery(result),
+      );
       return { orderStatus: applied.orderStatus };
     } catch (error) {
       this.lastSyncAt.delete(payment.id);
@@ -447,9 +476,17 @@ export class PaymentsService {
   async applyResult(
     payment: PaymentForResult,
     result: VnpayPaymentResult,
+    kind: ResultKind,
   ): Promise<ApplyResult> {
-    const success =
-      result.responseCode === '00' && result.transactionStatus === '00';
+    if (kind === 'PENDING') {
+      return {
+        orderId: payment.orderId,
+        orderStatus: await this.currentOrderStatus(payment.orderId),
+        success: payment.status === PaymentStatus.SUCCESS,
+      };
+    }
+
+    const success = kind === 'SUCCESS';
 
     const outcome = await this.prisma.$transaction(
       async (tx): Promise<ApplyOutcome> => {
@@ -694,7 +731,9 @@ export class PaymentsService {
         await this.refundOrder(payment.orderId);
       }
     } catch (error) {
-      this.logger.warn(`Không thể thử lại hoàn tiền: ${this.errorMessage(error)}`);
+      this.logger.warn(
+        `Không thể thử lại hoàn tiền: ${this.errorMessage(error)}`,
+      );
     }
   }
 
