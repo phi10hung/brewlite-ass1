@@ -114,7 +114,6 @@ async function main() {
     data: products.map(({ slug, ...p }) => ({
       ...p,
       imageUrl: `/images/drinks/${slug}.png`,
-      stock: 50,
     })),
   });
   await prisma.topping.createMany({ data: toppings });
