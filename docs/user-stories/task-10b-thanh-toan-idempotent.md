@@ -13,3 +13,5 @@ Là **khách hàng**, tôi muốn các lần bấm thanh toán hoặc request g�
 - [x] Thanh toán thất bại vẫn lưu Payment `FAILED`; lần thử lại dùng key mới đi qua `PAYMENT_FAILED → PENDING → PAID/PAYMENT_FAILED`
 - [x] Payment và cập nhật trạng thái đơn nằm trong một transaction; không tạo Payment nếu cập nhật đơn thất bại
 - [x] Có unit test cho idempotency, key trùng, thiếu key và race condition
+- [x] Cùng `Idempotency-Key` → trả lại đúng Payment cũ và cùng link VNPay, không tạo yêu cầu thanh toán mới
+- [x] Kết quả VNPay gửi về nhiều lần (trang kết quả, IPN, truy vấn trạng thái) chỉ cập nhật đơn và cộng điểm 1 lần
