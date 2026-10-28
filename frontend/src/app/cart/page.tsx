@@ -2,7 +2,10 @@
 "use client";
 
 import Link from "next/link";
-import { MAX_QUANTITY, useCartStore } from "@/store/cart-store";
+import { useEffect, useState } from "react";
+
+import { apiFetch } from "@/lib/api";
+import { useCartStore, type CartItem } from "@/store/cart-store";
 
 const formatPrice = (price: number) =>
   new Intl.NumberFormat("vi-VN", {
@@ -10,14 +13,79 @@ const formatPrice = (price: number) =>
     currency: "VND",
   }).format(price);
 
+const lineKey = (item: CartItem) =>
+  `${item.productId}-${item.size}-${[...item.toppingIds]
+    .sort((a, b) => a - b)
+    .join("|")}`;
+
 export default function CartPage() {
   const items = useCartStore((state) => state.items);
   const updateQuantity = useCartStore((state) => state.updateQuantity);
   const removeItem = useCartStore((state) => state.removeItem);
   const clear = useCartStore((state) => state.clear);
   const totalPrice = useCartStore((state) => state.totalPrice());
-    // Giỏ cũ có thể còn dòng trên 20 ly (lưu từ trước khi có giới hạn)
-  const overLimit = items.some((item) => item.quantity > MAX_QUANTITY);
+   // Số ly tối đa của từng dòng (key = lineKey), lấy từ API kho nguyên liệu
+  const [maxByKey, setMaxByKey] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (items.length === 0) return;
+    let cancelled = false;
+
+    Promise.all(
+      items.map(async (item) => {
+        const key = lineKey(item);
+        // Các dòng KHÁC trong giỏ (dùng chung nguyên liệu)
+        const others = items
+          .filter((other) => lineKey(other) !== key)
+          .map((other) => ({
+            productId: other.productId,
+            size: other.size,
+            toppingIds: other.toppingIds,
+            quantity: other.quantity,
+          }));
+        try {
+          const res = await apiFetch<{ maxQuantity: number }>(
+            "/products/availability",
+            {
+              method: "POST",
+              body: JSON.stringify({
+                items: others,
+                add: {
+                  productId: item.productId,
+                  size: item.size,
+                  toppingIds: item.toppingIds,
+                },
+              }),
+            }
+          );
+          return [key, res.maxQuantity] as const;
+        } catch {
+          // Lỗi mạng: không chặn khách, backend vẫn kiểm tra lúc tạo đơn
+          return null;
+        }
+      })
+    ).then((results) => {
+      if (cancelled) return;
+      const next: Record<string, number> = {};
+      for (const r of results) {
+        if (r) next[r[0]] = r[1];
+      }
+      setMaxByKey(next);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [items]);
+
+  // undefined = chưa biết (đang tải hoặc lỗi) → không khoá
+  const maxOf = (item: CartItem): number | undefined =>
+    maxByKey[lineKey(item)];
+  const isOver = (item: CartItem) => {
+    const max = maxOf(item);
+    return max !== undefined && item.quantity > max;
+  };
+  const overLimit = items.some(isOver);
 
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-4 py-10 text-stone-800">
@@ -51,9 +119,13 @@ export default function CartPage() {
         <div className="grid gap-8 md:grid-cols-[1fr_320px]">
           <section className="space-y-4">
             {items.map((item) => (
-              <article
-                key={`${item.productId}-${item.size}-${item.toppings.slice().sort().join(",")}`}
-                className="flex gap-4 rounded-2xl border border-stone-200 p-4"
+                            <article
+                key={lineKey(item)}
+                className={`flex gap-4 rounded-2xl border p-4 ${
+                  isOver(item)
+                    ? "border-red-300 bg-red-50"
+                    : "border-stone-200"
+                }`}
               >
                 <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-stone-100">
                   {item.imageUrl ? (
@@ -103,8 +175,11 @@ export default function CartPage() {
                       <button
                         type="button"
                         aria-label={`Tăng số lượng ${item.name}`}
-                        disabled={item.quantity >= MAX_QUANTITY}
-                        onClick={() =>
+                        disabled={
+                          maxOf(item) !== undefined &&
+                          item.quantity >= (maxOf(item) as number)
+                        }
+                            onClick={() =>
                           updateQuantity(
                             item.productId,
                             item.size,
@@ -132,11 +207,16 @@ export default function CartPage() {
                       Xóa
                     </button>
                   </div>
-                        {item.quantity >= MAX_QUANTITY && (
-                    <p className="mt-1 text-xs text-amber-700">
-                      Tối đa {MAX_QUANTITY} ly mỗi món
-                    </p>
-                  )}
+                                          {maxOf(item) !== undefined &&
+                    item.quantity >= (maxOf(item) as number) && (
+                      <p
+                        className={`mt-1 text-xs ${
+                          isOver(item) ? "text-red-700" : "text-amber-700"
+                        }`}
+                      >
+                        Chỉ còn pha được {maxOf(item)} ly
+                      </p>
+                    )}
                 </div>
 
                 <p className="whitespace-nowrap text-sm font-semibold">
@@ -176,10 +256,11 @@ export default function CartPage() {
               <span className="text-amber-900">{formatPrice(totalPrice)}</span>
             </div>
 
-            {overLimit ? (
+                        {overLimit ? (
               <>
-                <p className="mt-6 rounded-lg bg-red-50 p-3 text-sm text-red-700">
-                  Mỗi món tối đa {MAX_QUANTITY} ly. Hãy giảm số lượng trước khi thanh toán.
+                <p className="mt-6 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  Giỏ vượt quá nguyên liệu còn lại (các món dùng chung nguyên
+                  liệu). Hãy giảm số lượng hoặc bỏ bớt món được tô đỏ.
                 </p>
                 <span className="mt-3 block cursor-not-allowed rounded-xl bg-stone-300 px-4 py-3 text-center font-semibold text-white">
                   Tiến hành thanh toán
