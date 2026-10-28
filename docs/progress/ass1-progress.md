@@ -52,6 +52,9 @@
 |  |  | Chỉnh sửa | Review và merge PR #50 | Khoa, Quang | PR #50 |
 | 5 | 26/10/2026 | Chỉnh sửa | Chạy thử giao diện ở màn hình điện thoại (390px): Navbar chật, chữ "Lịch sử đơn", "Quản lý đơn", "Đăng xuất" xuống 2–3 dòng; tạo issue, gửi hướng dẫn sửa | Hùng | #67 |
 |  |  | Phân công | Sửa Navbar gọn 1 dòng trên điện thoại | Khoa | #67 |
+| 6 | 27/10/2026 | Phân công | Menu: món không đủ nguyên liệu pha thì làm mờ, gắn nhãn "Hết món", vẫn mở xem chi tiết được | Búp | #80 |
+| 7 | 28/10/2026 | Phân công | Chốt lại: Menu báo "Hết món" khi không pha được ly size S không topping; gửi lại hướng dẫn | Búp | #80 |
+|  |  | Phân công | Gửi hướng dẫn sửa Navbar trên điện thoại kèm code đầy đủ | Khoa | #67 |
 
 ## Task 4 – Chi tiết và tùy chọn sản phẩm
 
@@ -72,6 +75,8 @@
 |  |  | Phân công | Trang chi tiết không cho thêm vào giỏ vượt 20 ly | Búp | #64 |
 |  |  | Chỉnh sửa | Trang chi tiết tính cả số ly đã có trong giỏ (cùng size, topping): không cho thêm vượt 20 ly, báo còn thêm được bao nhiêu ly, hiện "Trong giỏ đã có X ly"; cập nhật User Story | Búp | #64, PR #71 |
 |  |  | Chỉnh sửa | Chạy thử trên trình duyệt, duyệt và merge PR #71 vào develop | Hùng | PR #71 |
+| 6 | 27/10/2026 | Phân công | Trang chi tiết hiện "Còn X ly" đổi theo size, topping; topping hết nguyên liệu thì khoá; bỏ giới hạn 20 ly | Búp | #80 |
+| 7 | 28/10/2026 | Phân công | Chốt lại: trang chi tiết chỉ tính theo kho thật (không trừ số ly trong giỏ), lấy số ly còn pha cho cả 3 size, size hết ghi "(hết)"; gửi lại hướng dẫn | Búp | #80 |
 
 ## Task 5 – Giỏ hàng
 
@@ -91,6 +96,8 @@
 |  |  | Phân công | Giỏ hàng giới hạn tối đa 20 ly mỗi món | Linh | #63 |
 |  |  | Chỉnh sửa | Giỏ hàng tối đa 20 ly mỗi món (cùng size, topping): gộp món hay bấm "+" không vượt 20, nút "+" mờ khi đủ 20; giỏ cũ có món vượt 20 ly thì cảnh báo và khoá nút thanh toán; cập nhật User Story | Linh | #63, PR #69 |
 |  |  | Chỉnh sửa | Chạy thử trên trình duyệt, duyệt và merge PR #69 vào develop | Hùng | PR #69 |
+| 5 | 27/10/2026 | Phân công | Giỏ hàng bỏ giới hạn 20 ly, giới hạn theo số ly còn pha từ kho nguyên liệu; dòng vượt số ly còn pha thì cảnh báo, chưa cho thanh toán | Linh | #79 |
+| 6 | 28/10/2026 | Phân công | Chốt lại: giỏ hàng cộng cả giỏ (các món dùng chung nguyên liệu, kể cả topping) để kiểm tra, vượt kho thì hiện cảnh báo đỏ và khoá nút thanh toán; gửi lại hướng dẫn | Linh | #79 |
 
 ## Task 6 – API tạo đơn hàng
 
@@ -104,6 +111,8 @@
 |  |  | Phân công | Câu báo lỗi kiểm tra dữ liệu gọn, dễ đọc | Quang | #65 |
 |  |  | Chỉnh sửa | Câu báo lỗi kiểm tra dữ liệu bỏ tiền tố "items.0.", không lặp câu trùng, giữ nguyên dạng trả về cũ; unit test | Quang | #65, PR #68 |
 |  |  | Chỉnh sửa | Chạy thử API, duyệt và merge PR #68 vào develop | Hùng | PR #68 |
+| 4 | 27/10/2026 | Phân công | Tạo đơn lưu phương thức thanh toán, hạn thanh toán 5 phút, tự hủy đơn chờ thanh toán cũ của khách; bỏ giới hạn 20 ly | Quang | #77 |
+| 5 | 28/10/2026 | Bổ sung | Tạo đơn lưu phương thức thanh toán, hạn 5 phút; đặt đơn mới tự hủy đơn chờ thanh toán cũ (trả nguyên liệu); API đơn hàng trả thêm hạn thanh toán, phương thức, trạng thái hoàn tiền; khách tự hủy đơn qua PATCH /orders/:id/cancel | Quang | #77, PR #84 |
 
 ## Task 7 – Đăng ký / Đăng nhập (JWT)
 
@@ -132,6 +141,17 @@
 |  |  | Phân công | Sửa 4 lỗi Checkout, tách commit theo từng phần và tạo PR | Linh | #14, #23 |
 | 5 | 25/10/2026 | Chỉnh sửa | Checkout hoàn chỉnh: gọi API kèm token (chưa đăng nhập thì chuyển sang trang đăng nhập), áp mã giảm giá qua POST /promotions/validate, hiện tên topping thay vì mã số, hiện điểm thưởng mới nhất, thanh toán lỗi thì thanh toán lại đúng đơn cũ (không tạo đơn mới, không trừ kho 2 lần); User Story Checkout và mã giảm giá | Linh | #14, #23, PR #53 |
 |  |  | Chỉnh sửa | Chạy thử Checkout, duyệt và merge PR #53 vào develop | Hùng | PR #53 |
+| 6 | 27/10/2026 | Phân công | Thanh toán qua cổng bên thứ ba VNPay Sandbox: POST /payments trả link thanh toán VNPay (vẫn idempotent), nhận kết quả, hoàn tiền và trừ điểm khi hủy đơn đã thanh toán | Triệu | #76 |
+|  |  | Phân công | Trang kết quả thanh toán VNPay, tác vụ tự hủy đơn quá hạn 5 phút, README cấu hình VNPay | Hùng | #78 |
+|  |  | Phân công | Checkout bỏ giả lập thanh toán lỗi, tạo đơn kèm phương thức thanh toán rồi chuyển sang thanh toán VNPay | Linh | #79 |
+|  |  | Bổ sung | Đăng ký tài khoản VNPay Sandbox cho nhóm (mã website, khoá bí mật chỉ để trong file .env, không đưa lên repo) | Hùng | #75 |
+|  |  | Bổ sung | Thanh toán VNPay Sandbox: lớp gọi VNPay (tạo link có chữ ký, kiểm tra chữ ký, truy vấn giao dịch, hoàn tiền); POST /payments trả link VNPay, giữ Idempotency-Key; nhận kết quả qua return URL, IPN, đồng bộ trạng thái; hoàn tiền và trừ điểm thưởng khi hủy đơn đã thanh toán; unit test, User Story | Triệu | #76, PR #83 |
+| 7 | 28/10/2026 | Chỉnh sửa | Review PR #83, chạy thử trả bằng thẻ test trên VNPay Sandbox: phát hiện 3 lỗi (VNPay chưa có kết quả bị coi là thanh toán lỗi, backend không chạy khi chưa có khoá VNPay, thời điểm tạo giao dịch trên link VNPay và trong database lệch nhau), yêu cầu sửa | Hùng | PR #83 |
+|  |  | Chỉnh sửa | Sửa 3 lỗi theo review, thêm unit test, cập nhật User Story | Triệu | #76, PR #83 |
+|  |  | Chỉnh sửa | Chạy thử lại, duyệt và merge PR #83 vào develop | Hùng | PR #83 |
+|  |  | Phân công | Chốt lại luồng thanh toán: Checkout chuyển thẳng sang trang thanh toán của VNPay (bỏ trang đơn chờ và mã QR), trả xong về trang kết quả; thanh toán tiếp, hủy đơn ở trang chi tiết đơn; bỏ dòng "Có 5 phút để thanh toán" ở Checkout; gửi lại hướng dẫn | Hùng | #78, #79, #81 |
+|  |  | Chỉnh sửa | Chạy thử: trả thành công trên VNPay nhưng đơn vẫn chờ thanh toán vì API tra cứu của VNPay Sandbox báo lỗi 99; tạo issue, gửi hướng dẫn sửa | Hùng | #85 |
+|  |  | Phân công | Thanh toán VNPay không kẹt chờ khi VNPay tra cứu lỗi: dùng kết quả trên trang trả về đã kiểm tra chữ ký và số tiền | Triệu | #85 |
 
 ## Task 9 – Xác nhận, lịch sử đơn và bàn giao
 
@@ -153,6 +173,8 @@
 |  |  | Bổ sung | Chạy thử trên develop mới nhất: lint, 104 unit test, build backend và frontend đều đạt; bật toàn bộ bằng Docker, kiểm thử 54 trường hợp API theo luồng menu → đặt đơn → thanh toán lỗi/thanh toán lại → xác nhận → lịch sử → nhân viên đổi trạng thái, hủy đơn: đều đạt | Hùng | #17 |
 | 5 | 26/10/2026 | Chỉnh sửa | Chạy thử lại toàn bộ trên develop (lint, unit test, build, Docker, kiểm thử API) và bấm thử giao diện trên Chrome, đối chiếu yêu cầu đề: phát hiện 5 lỗi (giỏ hàng và trang chi tiết cho vượt 20 ly, câu báo lỗi có tiền tố items.0., đặt đồng thời báo 409 dù còn hàng, Navbar chật trên điện thoại); tạo issue và gửi hướng dẫn sửa cho từng bạn | Hùng | #17, #63–#67 |
 |  |  | Chỉnh sửa | Ghép thử 4 PR #68–#71 trên develop trước khi merge: không conflict, 109 unit test, lint và build backend, frontend đều đạt | Hùng | PR #68–#71 |
+| 6 | 27/10/2026 | Phân công | Lịch sử đơn: thanh toán tiếp đơn đang chờ, hủy đơn đã thanh toán và hiện trạng thái hoàn tiền; tên trạng thái dùng chung theo sơ đồ 9.1 | Khoa | #81 |
+| 7 | 28/10/2026 | Phân công | Gửi hướng dẫn kèm code đầy đủ: chi tiết đơn chờ thanh toán có đếm ngược, nút Tiếp tục thanh toán / Thanh toán lại, Hủy đơn; đơn đã thanh toán có nút hủy kèm hoàn tiền; tiêu đề đổi theo trạng thái | Khoa | #81 |
 
 ## Task 10 – Nghiệp vụ backend nâng cao
 
@@ -191,6 +213,14 @@
 |  |  | Phân công | Đặt đồng thời không báo 409 khi kho còn hàng | Quang | #66 |
 |  |  | Chỉnh sửa | Tăng số lần thử lại khi xung đột version (3 → 10), chờ ngẫu nhiên một chút trước mỗi lần thử lại; unit test, cập nhật User Story Task 10c | Quang | #66, PR #70 |
 |  |  | Chỉnh sửa | Chạy thử 20, 30 đơn đồng thời (đều thành công) và 45 đơn khi kho còn 30 (đúng 30 đơn thành công, không bán vượt kho), duyệt và merge PR #70 | Hùng | PR #70 |
+| 7 | 27/10/2026 | Phân công | Database kho nguyên liệu, công thức pha chế và thanh toán VNPay (làm trước để cả nhóm làm tiếp) | Hùng | #75 |
+|  |  | Bổ sung | Database: bảng nguyên liệu (tồn kho, version), công thức món, công thức topping, nguyên liệu đã trừ của đơn; đơn hàng thêm phương thức, hạn thanh toán; thanh toán thêm trạng thái chờ, mã giao dịch VNPay, trạng thái hoàn tiền; điểm thưởng thêm loại cộng/trừ; dữ liệu mẫu 22 nguyên liệu, công thức 14 món, 9 topping; biến môi trường VNPay; User Story | Hùng | #75, PR #82 |
+|  |  | Chỉnh sửa | Review và merge PR #82 | Quang | PR #82 |
+|  |  | Phân công | Kho tính theo nguyên liệu và công thức pha chế (size S 0,8 lần, M 1 lần, L 1,3 lần, topping cũng tốn nguyên liệu); hủy đơn trả nguyên liệu | Quang | #77 |
+|  |  | Phân công | Trang nhân viên: đổi chữ nút theo sơ đồ 9.1, hủy đơn qua hàm hủy chung, bảng kho nguyên liệu | Búp | #80 |
+|  |  | Bổ sung | Hàm tính lượng nguyên liệu theo công thức và size; User Story kho nguyên liệu | Quang | #77 |
+| 8 | 28/10/2026 | Bổ sung | Đặt đơn trừ nguyên liệu theo công thức trong transaction, optimistic locking theo version của nguyên liệu, thiếu thì không trừ gì; API sản phẩm tính số ly còn pha được, thêm POST /products/availability; hủy đơn trả nguyên liệu đúng 1 lần, đơn đã thanh toán thì trừ điểm và hoàn tiền; bỏ tồn kho theo món; test đặt đồng thời không vượt kho nguyên liệu; User Story | Quang | #77, PR #84 |
+|  |  | Chỉnh sửa | Chạy thử PR #84: số ly còn pha đúng theo công thức từng size, đặt 6 đơn đồng thời khi kho chỉ đủ 2 ly thì đúng 2 đơn thành công, hủy 2 lần chỉ trả nguyên liệu 1 lần, hủy đơn đã thanh toán trả nguyên liệu và trừ điểm; duyệt và merge vào develop | Hùng | PR #84 |
 
 ## Tài liệu – User Story và bảng tiến độ
 
@@ -208,3 +238,6 @@
 |  |  | Bổ sung | Ghi bảng tiến độ ngày 25/10 | Hùng | #22 |
 | 5 | 26/10/2026 | Chỉnh sửa | Review và merge PR #62 (tiến độ 25/10) | Quang | PR #62 |
 |  |  | Bổ sung | Ghi bảng tiến độ ngày 26/10 | Hùng | #22 |
+| 6 | 27/10/2026 | Chỉnh sửa | Review và merge PR #72 (tiến độ 26/10) | Quang | PR #72 |
+|  |  | Phân công | Chốt phạm vi chỉnh sửa: thanh toán qua cổng bên thứ ba (VNPay Sandbox) có hoàn tiền, kho tính theo nguyên liệu và công thức pha chế; tạo 7 issue #75–#81, gửi file hướng dẫn cho từng thành viên | Hùng | #75–#81 |
+| 7 | 28/10/2026 | Bổ sung | Ghi bảng tiến độ ngày 27/10 (ghi bù) và 28/10 | Hùng | #22 |
