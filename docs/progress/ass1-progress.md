@@ -50,6 +50,8 @@
 |  |  | Bổ sung | Trang Menu lấy danh sách món từ API GET /products, bỏ dữ liệu giả, cập nhật User Story | Búp | #5, PR #40 |
 | 4 | 24/10/2026 | Chỉnh sửa | Thay 14 hình minh hoạ đồ uống bằng ảnh chụp (.png), dữ liệu mẫu dùng ảnh mới; đổi màu chung toàn trang: nền kem, chữ nâu, bỏ chế độ tối | Hùng | PR #50 |
 |  |  | Chỉnh sửa | Review và merge PR #50 | Khoa, Quang | PR #50 |
+| 5 | 26/10/2026 | Chỉnh sửa | Chạy thử giao diện ở màn hình điện thoại (390px): Navbar chật, chữ "Lịch sử đơn", "Quản lý đơn", "Đăng xuất" xuống 2–3 dòng; tạo issue, gửi hướng dẫn sửa | Hùng | #67 |
+|  |  | Phân công | Sửa Navbar gọn 1 dòng trên điện thoại | Khoa | #67 |
 
 ## Task 4 – Chi tiết và tùy chọn sản phẩm
 
@@ -66,6 +68,10 @@
 | 4 | 25/10/2026 | Phân công | Sửa khung ảnh trang chi tiết bị bè ngang: khung vuông, căn giữa | Búp | #55 |
 |  |  | Chỉnh sửa | Khung ảnh trang chi tiết đổi sang khung vuông (aspect-square, max-w-md), căn giữa | Búp | #55, PR #60 |
 |  |  | Chỉnh sửa | Duyệt và merge PR #60 vào develop | Hùng | PR #60 |
+| 5 | 26/10/2026 | Chỉnh sửa | Chạy thử: trang chi tiết không tính số ly đã có trong giỏ, thêm được quá 20 ly mỗi món (API chỉ nhận tối đa 20); tạo issue, gửi hướng dẫn sửa | Hùng | #64 |
+|  |  | Phân công | Trang chi tiết không cho thêm vào giỏ vượt 20 ly | Búp | #64 |
+|  |  | Chỉnh sửa | Trang chi tiết tính cả số ly đã có trong giỏ (cùng size, topping): không cho thêm vượt 20 ly, báo còn thêm được bao nhiêu ly, hiện "Trong giỏ đã có X ly"; cập nhật User Story | Búp | #64, PR #71 |
+|  |  | Chỉnh sửa | Chạy thử trên trình duyệt, duyệt và merge PR #71 vào develop | Hùng | PR #71 |
 
 ## Task 5 – Giỏ hàng
 
@@ -81,6 +87,10 @@
 |  |  | Chỉnh sửa | Review PR #37: trang giỏ hàng lỗi biên dịch (vẫn truyền tên topping), yêu cầu sửa | Hùng | PR #37 |
 |  |  | Chỉnh sửa | Sửa trang giỏ hàng dùng toppingIds, xoá giỏ cũ chưa có toppingIds | Linh | PR #37 |
 |  |  | Chỉnh sửa | Duyệt và merge PR #37 vào develop | Hùng | PR #37 |
+| 4 | 26/10/2026 | Chỉnh sửa | Chạy thử: giỏ hàng gộp món hoặc bấm "+" vượt 20 ly mỗi món, đến Checkout mới báo lỗi; tạo issue, gửi hướng dẫn sửa | Hùng | #63 |
+|  |  | Phân công | Giỏ hàng giới hạn tối đa 20 ly mỗi món | Linh | #63 |
+|  |  | Chỉnh sửa | Giỏ hàng tối đa 20 ly mỗi món (cùng size, topping): gộp món hay bấm "+" không vượt 20, nút "+" mờ khi đủ 20; giỏ cũ có món vượt 20 ly thì cảnh báo và khoá nút thanh toán; cập nhật User Story | Linh | #63, PR #69 |
+|  |  | Chỉnh sửa | Chạy thử trên trình duyệt, duyệt và merge PR #69 vào develop | Hùng | PR #69 |
 
 ## Task 6 – API tạo đơn hàng
 
@@ -90,6 +100,10 @@
 | 2 | 23/10/2026 | Phân công | API POST /orders: tính giá ở backend, lưu đơn PENDING, yêu cầu đăng nhập | Quang | #9 |
 |  |  | Bổ sung | API POST /orders: DTO kiểm tra dữ liệu, tính giá ở backend, lưu Order + OrderItem trạng thái PENDING, sinh mã đơn, yêu cầu đăng nhập, unit test, User Story | Quang | #9, PR #39 |
 |  |  | Chỉnh sửa | Duyệt và merge PR #39 vào develop | Hùng | PR #39 |
+| 3 | 26/10/2026 | Chỉnh sửa | Chạy thử API: câu báo lỗi kiểm tra dữ liệu có tiền tố "items.0." và lặp lại khi nhiều món cùng lỗi; tạo issue, gửi hướng dẫn sửa | Hùng | #65 |
+|  |  | Phân công | Câu báo lỗi kiểm tra dữ liệu gọn, dễ đọc | Quang | #65 |
+|  |  | Chỉnh sửa | Câu báo lỗi kiểm tra dữ liệu bỏ tiền tố "items.0.", không lặp câu trùng, giữ nguyên dạng trả về cũ; unit test | Quang | #65, PR #68 |
+|  |  | Chỉnh sửa | Chạy thử API, duyệt và merge PR #68 vào develop | Hùng | PR #68 |
 
 ## Task 7 – Đăng ký / Đăng nhập (JWT)
 
@@ -137,6 +151,8 @@
 | 4 | 25/10/2026 | Bổ sung | Docker hoá: Dockerfile backend (tự tạo bảng, nạp dữ liệu mẫu khi database trống), Dockerfile frontend, docker-compose chạy cả database, backend, frontend (profile app); Prisma sinh import đuôi .js để chạy được trong Docker; README hướng dẫn chạy toàn bộ bằng Docker | Hùng | #17, PR #52 |
 |  |  | Chỉnh sửa | Review và merge PR #52 | Quang | PR #52 |
 |  |  | Bổ sung | Chạy thử trên develop mới nhất: lint, 104 unit test, build backend và frontend đều đạt; bật toàn bộ bằng Docker, kiểm thử 54 trường hợp API theo luồng menu → đặt đơn → thanh toán lỗi/thanh toán lại → xác nhận → lịch sử → nhân viên đổi trạng thái, hủy đơn: đều đạt | Hùng | #17 |
+| 5 | 26/10/2026 | Chỉnh sửa | Chạy thử lại toàn bộ trên develop (lint, unit test, build, Docker, kiểm thử API) và bấm thử giao diện trên Chrome, đối chiếu yêu cầu đề: phát hiện 5 lỗi (giỏ hàng và trang chi tiết cho vượt 20 ly, câu báo lỗi có tiền tố items.0., đặt đồng thời báo 409 dù còn hàng, Navbar chật trên điện thoại); tạo issue và gửi hướng dẫn sửa cho từng bạn | Hùng | #17, #63–#67 |
+|  |  | Chỉnh sửa | Ghép thử 4 PR #68–#71 trên develop trước khi merge: không conflict, 109 unit test, lint và build backend, frontend đều đạt | Hùng | PR #68–#71 |
 
 ## Task 10 – Nghiệp vụ backend nâng cao
 
@@ -171,6 +187,10 @@
 |  |  | Chỉnh sửa | Duyệt và merge PR #61 vào develop | Hùng | PR #61 |
 |  |  | Bổ sung | Làm thêm: hiện điểm thưởng ⭐ của khách trên Navbar, tự cập nhật sau khi thanh toán | Hùng | #57, PR #58 |
 |  |  | Chỉnh sửa | Review PR #58 (Quang), merge vào develop (Hùng) | Quang, Hùng | PR #58 |
+| 6 | 26/10/2026 | Chỉnh sửa | Chạy thử 20–30 đơn đặt đồng thời cùng một món: nhiều đơn bị báo 409 (bận) dù kho còn hàng; tạo issue, gửi hướng dẫn sửa | Hùng | #66 |
+|  |  | Phân công | Đặt đồng thời không báo 409 khi kho còn hàng | Quang | #66 |
+|  |  | Chỉnh sửa | Tăng số lần thử lại khi xung đột version (3 → 10), chờ ngẫu nhiên một chút trước mỗi lần thử lại; unit test, cập nhật User Story Task 10c | Quang | #66, PR #70 |
+|  |  | Chỉnh sửa | Chạy thử 20, 30 đơn đồng thời (đều thành công) và 45 đơn khi kho còn 30 (đúng 30 đơn thành công, không bán vượt kho), duyệt và merge PR #70 | Hùng | PR #70 |
 
 ## Tài liệu – User Story và bảng tiến độ
 
@@ -186,3 +206,5 @@
 |  |  | Chỉnh sửa | Review và merge PR #42 (tiến độ 23/10, phân công đợt 3) | Quang | PR #42 |
 | 4 | 25/10/2026 | Chỉnh sửa | Review PR #51 (tiến độ 24/10) (Quang), merge vào develop (Búp) | Quang, Búp | PR #51 |
 |  |  | Bổ sung | Ghi bảng tiến độ ngày 25/10 | Hùng | #22 |
+| 5 | 26/10/2026 | Chỉnh sửa | Review và merge PR #62 (tiến độ 25/10) | Quang | PR #62 |
+|  |  | Bổ sung | Ghi bảng tiến độ ngày 26/10 | Hùng | #22 |

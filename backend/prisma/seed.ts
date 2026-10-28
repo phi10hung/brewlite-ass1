@@ -39,11 +39,75 @@ const toppings = [
   { name: 'Thạch phô mai', price: 12000 },
 ];
 
+// Kho nguyên liệu (số liệu bịa cho demo)
+const ingredients = [
+  { name: 'Cà phê hạt', unit: 'g', stock: 1500 },
+  { name: 'Sữa đặc', unit: 'ml', stock: 3000 },
+  { name: 'Sữa tươi', unit: 'ml', stock: 8000 },
+  { name: 'Đường', unit: 'g', stock: 3000 },
+  { name: 'Trà đen', unit: 'g', stock: 600 },
+  { name: 'Bột matcha', unit: 'g', stock: 400 },
+  { name: 'Bột cacao', unit: 'g', stock: 600 },
+  { name: 'Bơ', unit: 'g', stock: 3000 },
+  { name: 'Đào ngâm', unit: 'g', stock: 2000 },
+  { name: 'Mứt dâu', unit: 'ml', stock: 1500 },
+  { name: 'Mứt nho', unit: 'ml', stock: 1500 },
+  { name: 'Mứt xoài', unit: 'ml', stock: 1500 },
+  { name: 'Bánh cookie', unit: 'cái', stock: 60 },
+  { name: 'Kem tươi', unit: 'ml', stock: 2000 },
+  { name: 'Trân châu đen', unit: 'g', stock: 1000 },
+  { name: 'Trân châu trắng', unit: 'g', stock: 1000 },
+  { name: 'Thạch cà phê', unit: 'g', stock: 1000 },
+  { name: 'Thạch trái cây', unit: 'g', stock: 1000 },
+  { name: 'Thạch phô mai', unit: 'g', stock: 1000 },
+  { name: 'Kem cheese', unit: 'ml', stock: 1000 },
+  { name: 'Pudding', unit: 'cái', stock: 40 },
+  { name: 'Bánh flan', unit: 'cái', stock: 30 },
+];
+
+// Công thức pha chế cho size M: [nguyên liệu, lượng]. Size S nhân 0,8, size L nhân 1,3
+const productRecipes: Record<string, [string, number][]> = {
+  'Cà phê sữa đá': [['Cà phê hạt', 20], ['Sữa đặc', 30]],
+  'Cà phê đen đá': [['Cà phê hạt', 20], ['Đường', 10]],
+  'Bạc xỉu': [['Cà phê hạt', 10], ['Sữa đặc', 30], ['Sữa tươi', 60]],
+  Cappuccino: [['Cà phê hạt', 18], ['Sữa tươi', 150]],
+  Latte: [['Cà phê hạt', 18], ['Sữa tươi', 200]],
+  'Trà đào cam sả': [['Trà đen', 5], ['Đào ngâm', 60], ['Đường', 15]],
+  'Trà sữa trân châu': [['Trà đen', 6], ['Sữa tươi', 120], ['Trân châu đen', 40]],
+  'Matcha latte': [['Bột matcha', 6], ['Sữa tươi', 200]],
+  'Sinh tố bơ': [['Bơ', 150], ['Sữa đặc', 40]],
+  'Chocolate đá xay': [['Bột cacao', 25], ['Sữa tươi', 150], ['Kem tươi', 30]],
+  'Trà dâu': [['Trà đen', 5], ['Mứt dâu', 40]],
+  'Trà nho': [['Trà đen', 5], ['Mứt nho', 40]],
+  'Trà xoài': [['Trà đen', 5], ['Mứt xoài', 40]],
+  'Cookie đá xay': [['Bánh cookie', 2], ['Sữa tươi', 150], ['Kem tươi', 30]],
+};
+
+// Công thức topping: lượng cố định, không nhân theo size
+const toppingRecipes: Record<string, [string, number][]> = {
+  'Trân châu đen': [['Trân châu đen', 40]],
+  'Thạch cà phê': [['Thạch cà phê', 40]],
+  'Kem cheese': [['Kem cheese', 30]],
+  'Thêm 1 shot espresso': [['Cà phê hạt', 9]],
+  'Trân châu trắng': [['Trân châu trắng', 40]],
+  Pudding: [['Pudding', 1]],
+  'Thạch trái cây': [['Thạch trái cây', 40]],
+  'Bánh flan': [['Bánh flan', 1]],
+  'Thạch phô mai': [['Thạch phô mai', 40]],
+};
+
+// Tra id theo tên, sai tên thì báo lỗi ngay thay vì bỏ qua
+function idOf(map: Map<string, number>, name: string): number {
+  const id = map.get(name);
+  if (id === undefined) throw new Error(`Seed: không tìm thấy "${name}"`);
+  return id;
+}
+
 async function main() {
   // Xoá dữ liệu cũ và ĐẶT LẠI id về 1, để chạy seed bao nhiêu lần
   // thì Cà phê sữa đá vẫn là id 1, Latte vẫn là id 5...
   await prisma.$executeRawUnsafe(
-    'TRUNCATE "LoyaltyTransaction", "Payment", "OrderItem", "Order", "Product", "Topping", "Promotion", "User" RESTART IDENTITY CASCADE',
+    'TRUNCATE "OrderIngredient", "ToppingRecipe", "Recipe", "Ingredient", "LoyaltyTransaction", "Payment", "OrderItem", "Order", "Product", "Topping", "Promotion", "User" RESTART IDENTITY CASCADE',
   );
 
   await prisma.product.createMany({
@@ -54,6 +118,35 @@ async function main() {
     })),
   });
   await prisma.topping.createMany({ data: toppings });
+  await prisma.ingredient.createMany({ data: ingredients });
+
+  const [productRows, toppingRows, ingredientRows] = await Promise.all([
+    prisma.product.findMany({ select: { id: true, name: true } }),
+    prisma.topping.findMany({ select: { id: true, name: true } }),
+    prisma.ingredient.findMany({ select: { id: true, name: true } }),
+  ]);
+  const productIds = new Map(productRows.map((p) => [p.name, p.id]));
+  const toppingIds = new Map(toppingRows.map((t) => [t.name, t.id]));
+  const ingredientIds = new Map(ingredientRows.map((i) => [i.name, i.id]));
+
+  await prisma.recipe.createMany({
+    data: Object.entries(productRecipes).flatMap(([product, items]) =>
+      items.map(([ingredient, amount]) => ({
+        productId: idOf(productIds, product),
+        ingredientId: idOf(ingredientIds, ingredient),
+        amount,
+      })),
+    ),
+  });
+  await prisma.toppingRecipe.createMany({
+    data: Object.entries(toppingRecipes).flatMap(([topping, items]) =>
+      items.map(([ingredient, amount]) => ({
+        toppingId: idOf(toppingIds, topping),
+        ingredientId: idOf(ingredientIds, ingredient),
+        amount,
+      })),
+    ),
+  });
 
   await prisma.promotion.createMany({
     data: [
@@ -70,7 +163,9 @@ async function main() {
     ],
   });
 
-  console.log(`Seed xong: ${products.length} đồ uống, ${toppings.length} topping, 2 mã giảm giá, 2 tài khoản`);
+  console.log(
+    `Seed xong: ${products.length} đồ uống, ${toppings.length} topping, ${ingredients.length} nguyên liệu kèm công thức, 2 mã giảm giá, 2 tài khoản`,
+  );
 }
 
 main()

@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCartStore } from "@/store/cart-store";
+import { MAX_QUANTITY, useCartStore } from "@/store/cart-store";
 
 const formatPrice = (price: number) =>
   new Intl.NumberFormat("vi-VN", {
@@ -16,6 +16,8 @@ export default function CartPage() {
   const removeItem = useCartStore((state) => state.removeItem);
   const clear = useCartStore((state) => state.clear);
   const totalPrice = useCartStore((state) => state.totalPrice());
+    // Giỏ cũ có thể còn dòng trên 20 ly (lưu từ trước khi có giới hạn)
+  const overLimit = items.some((item) => item.quantity > MAX_QUANTITY);
 
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-4 py-10 text-stone-800">
@@ -101,6 +103,7 @@ export default function CartPage() {
                       <button
                         type="button"
                         aria-label={`Tăng số lượng ${item.name}`}
+                        disabled={item.quantity >= MAX_QUANTITY}
                         onClick={() =>
                           updateQuantity(
                             item.productId,
@@ -109,7 +112,7 @@ export default function CartPage() {
                             item.quantity + 1
                           )
                         }
-                        className="px-3 py-1.5 hover:bg-stone-100"
+                        className="px-3 py-1.5 hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         +
                       </button>
@@ -129,6 +132,11 @@ export default function CartPage() {
                       Xóa
                     </button>
                   </div>
+                        {item.quantity >= MAX_QUANTITY && (
+                    <p className="mt-1 text-xs text-amber-700">
+                      Tối đa {MAX_QUANTITY} ly mỗi món
+                    </p>
+                  )}
                 </div>
 
                 <p className="whitespace-nowrap text-sm font-semibold">
@@ -168,12 +176,23 @@ export default function CartPage() {
               <span className="text-amber-900">{formatPrice(totalPrice)}</span>
             </div>
 
-            <Link
-              href="/checkout"
-              className="mt-6 block rounded-xl bg-amber-800 px-4 py-3 text-center font-semibold text-white hover:bg-amber-900"
-            >
-              Tiến hành thanh toán
-            </Link>
+            {overLimit ? (
+              <>
+                <p className="mt-6 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+                  Mỗi món tối đa {MAX_QUANTITY} ly. Hãy giảm số lượng trước khi thanh toán.
+                </p>
+                <span className="mt-3 block cursor-not-allowed rounded-xl bg-stone-300 px-4 py-3 text-center font-semibold text-white">
+                  Tiến hành thanh toán
+                </span>
+              </>
+            ) : (
+              <Link
+                href="/checkout"
+                className="mt-6 block rounded-xl bg-amber-800 px-4 py-3 text-center font-semibold text-white hover:bg-amber-900"
+              >
+                Tiến hành thanh toán
+              </Link>
+            )}
 
             <p className="mt-3 text-center text-xs text-stone-500">
               Mã giảm giá và điểm tích lũy sẽ được xử lý ở bước tiếp theo.

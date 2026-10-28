@@ -3,9 +3,9 @@
 // Payment.idempotencyKey (@unique), User.loyaltyPoints, Promotion, LoyaltyTransaction.
 
 generator client {
-  provider     = "prisma-client"
-  output       = "../src/generated/prisma"
-  moduleFormat = "cjs"
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "cjs"
   importFileExtension = "js"
 }
 
@@ -40,8 +40,20 @@ enum PaymentMethod {
 }
 
 enum PaymentStatus {
+  PENDING // đã tạo link VNPay, chờ khách thanh toán
   SUCCESS
   FAILED
+}
+
+enum RefundStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum LoyaltyType {
+  EARN // cộng điểm khi đơn PAID
+  REVOKE // trừ lại khi hủy đơn đã PAID
 }
 
 enum DiscountType {
@@ -72,29 +84,82 @@ model Product {
   version     Int         @default(0) // tăng mỗi lần trừ tồn kho (optimistic locking)
   createdAt   DateTime    @default(now())
   orderItems  OrderItem[]
+  recipes     Recipe[]
 }
 
 model Topping {
-  id    Int    @id @default(autoincrement())
-  name  String
-  price Int
+  id      Int             @id @default(autoincrement())
+  name    String
+  price   Int
+  recipes ToppingRecipe[]
+}
+
+// Kho nguyên liệu: số ly còn pha được của mỗi món tính từ bảng này
+model Ingredient {
+  id             Int               @id @default(autoincrement())
+  name           String            @unique
+  unit           String // g, ml, cái
+  stock          Int               @default(0)
+  version        Int               @default(0) // tăng mỗi lần trừ/trả kho (optimistic locking)
+  recipes        Recipe[]
+  toppingRecipes ToppingRecipe[]
+  orderUsages    OrderIngredient[]
+}
+
+// Công thức pha chế của món cho size M (S nhân 0,8, L nhân 1,3)
+model Recipe {
+  id           Int        @id @default(autoincrement())
+  product      Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId    Int
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
+  ingredientId Int
+  amount       Int
+
+  @@unique([productId, ingredientId])
+}
+
+// Công thức của topping, lượng cố định không nhân theo size
+model ToppingRecipe {
+  id           Int        @id @default(autoincrement())
+  topping      Topping    @relation(fields: [toppingId], references: [id], onDelete: Cascade)
+  toppingId    Int
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
+  ingredientId Int
+  amount       Int
+
+  @@unique([toppingId, ingredientId])
+}
+
+// Lượng nguyên liệu đã trừ cho từng đơn, để hủy đơn thì trả lại đúng
+model OrderIngredient {
+  id           Int        @id @default(autoincrement())
+  order        Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId      Int
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
+  ingredientId Int
+  amount       Int
+
+  @@unique([orderId, ingredientId])
 }
 
 model Order {
-  id            Int                 @id @default(autoincrement())
-  code          String              @unique // mã đơn hiển thị cho khách, ví dụ BL-7K2M9Q
-  status        OrderStatus         @default(PENDING)
+  id            Int                  @id @default(autoincrement())
+  code          String               @unique // mã đơn hiển thị cho khách, ví dụ BL-7K2M9Q
+  status        OrderStatus          @default(PENDING)
   subtotal      Int
-  discount      Int                 @default(0)
+  discount      Int                  @default(0)
   total         Int
   promotionCode String?
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
-  user          User                @relation(fields: [userId], references: [id])
+  paymentMethod PaymentMethod? // Ví/Thẻ khách chọn ở Checkout
+  expiresAt     DateTime? // hạn thanh toán, quá hạn thì tự hủy (đơn cũ để trống)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  user          User                 @relation(fields: [userId], references: [id])
   userId        Int
   items         OrderItem[]
   payments      Payment[]
-  loyalty       LoyaltyTransaction?
+  loyalty       LoyaltyTransaction[]
+  ingredients   OrderIngredient[]
 }
 
 model OrderItem {
@@ -119,6 +184,12 @@ model Payment {
   status         PaymentStatus
   amount         Int
   idempotencyKey String        @unique // cùng key = cùng một lần thanh toán
+  txnRef         String?       @unique // vnp_TxnRef gửi sang VNPay
+  payUrl         String? // link trang thanh toán VNPay
+  transactionNo  String? // vnp_TransactionNo VNPay trả về, cần khi hoàn tiền
+  payDate        String? // vnp_PayDate (yyyyMMddHHmmss), cần khi hoàn tiền
+  refundStatus   RefundStatus?
+  refundedAt     DateTime?
   createdAt      DateTime      @default(now())
 }
 
@@ -133,11 +204,14 @@ model Promotion {
 }
 
 model LoyaltyTransaction {
-  id        Int      @id @default(autoincrement())
-  user      User     @relation(fields: [userId], references: [id])
+  id        Int         @id @default(autoincrement())
+  user      User        @relation(fields: [userId], references: [id])
   userId    Int
-  order     Order    @relation(fields: [orderId], references: [id])
-  orderId   Int      @unique // mỗi đơn chỉ được cộng điểm 1 lần
-  points    Int
-  createdAt DateTime @default(now())
+  order     Order       @relation(fields: [orderId], references: [id])
+  orderId   Int
+  type      LoyaltyType @default(EARN)
+  points    Int // EARN: số dương, REVOKE: số âm
+  createdAt DateTime    @default(now())
+
+  @@unique([orderId, type]) // mỗi đơn cộng 1 lần, trừ 1 lần
 }
