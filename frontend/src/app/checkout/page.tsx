@@ -11,12 +11,6 @@ import { useAuthStore } from "@/store/auth";
 
 type PaymentMethod = "WALLET" | "CARD";
 
-type PaymentResponse = {
-  id: number;
-  status: "SUCCESS" | "FAILED";
-  amount: number;
-};
-
 type OrderResponse = {
   id: number;
   code?: string;
@@ -32,7 +26,12 @@ type PromotionResponse = {
   total: number;
 };
 
-
+type PendingOrder = {
+  id: number;
+  code?: string;
+  status: string;
+  expiresAt?: string | null;
+};
 
 function formatPrice(value: number) {
   return `${value.toLocaleString("vi-VN")}đ`;
@@ -43,12 +42,12 @@ export default function CheckoutPage() {
 
   const items = useCartStore((state) => state.items);
   const totalPrice = useCartStore((state) => state.totalPrice());
-  const clear = useCartStore((state) => state.clear);
   const token = useAuthStore((state) => state.token);
   const hydrated = useAuthStore((state) => state.hydrated);
   const user = useAuthStore((state) => state.user);
   // Điểm thưởng: lấy số mới nhất từ GET /auth/me (số lúc đăng nhập có thể đã cũ)
   const [latestPoints, setLatestPoints] = useState<number | null>(null);
+  const [pendingOrder, setPendingOrder] = useState<PendingOrder | null>(null);
   const loyaltyPoints = latestPoints ?? user?.loyaltyPoints ?? 0;
 
   useEffect(() => {
@@ -57,6 +56,25 @@ export default function CheckoutPage() {
       .then((me) => setLatestPoints(me.loyaltyPoints))
       .catch(() => {
         // Lỗi thì giữ số điểm cũ, không chặn việc thanh toán
+      });
+  }, [token]);
+
+    useEffect(() => {
+    if (!token) return;
+    apiFetch<PendingOrder[]>("/orders/me")
+      .then((orders) => {
+        const list = Array.isArray(orders) ? orders : [];
+        const now = Date.now();
+        const found = list.find(
+          (o) =>
+            (o.status === "PENDING" || o.status === "PAYMENT_FAILED") &&
+            o.expiresAt &&
+            new Date(o.expiresAt).getTime() > now
+        );
+        setPendingOrder(found ?? null);
+      })
+      .catch(() => {
+        // Lỗi thì không hiện nhắc nhở, không chặn việc thanh toán
       });
   }, [token]);
 
@@ -73,11 +91,9 @@ export default function CheckoutPage() {
   const [method, setMethod] =
     useState<PaymentMethod>("WALLET");
 
-  const [simulateFail, setSimulateFail] = useState(false);
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pendingOrderId, setPendingOrderId] = useState<number | null>(null);
+  const [pendingLink, setPendingLink] = useState<string | null>(null);
 
   // Promotion
   const [promotionCode, setPromotionCode] = useState("");
@@ -135,7 +151,7 @@ export default function CheckoutPage() {
     }
   }
 
-  async function handleCheckout() {
+    async function handleCheckout() {
     if (items.length === 0) {
       router.push("/cart");
       return;
@@ -143,79 +159,51 @@ export default function CheckoutPage() {
 
     setLoading(true);
     setError(null);
-
-    // Một key cho lần bấm thanh toán này.
-    // Nếu bổ sung retry do network sau này, phải tái sử dụng key này.
-    const idempotencyKey = crypto.randomUUID();
+    setPendingLink(null);
 
     try {
-      // Thanh toán lỗi trước đó → dùng lại đúng đơn cũ, KHÔNG tạo đơn mới
-      // (tránh đơn rác và trừ kho 2 lần)
-      let orderId = pendingOrderId;
+      // 1. Tạo đơn (backend kiểm tra và giữ nguyên liệu 5 phút)
+      const order = await apiFetch<OrderResponse>("/orders", {
+        method: "POST",
+        body: JSON.stringify({
+          items: items.map((item) => ({
+            productId: item.productId,
+            size: item.size,
+            toppingIds: item.toppingIds,
+            quantity: item.quantity,
+          })),
+          ...(appliedPromotionCode
+            ? { promotionCode: appliedPromotionCode }
+            : {}),
+          paymentMethod: method,
+        }),
+      });
 
-      if (orderId === null) {
-        const order = await apiFetch<OrderResponse>("/orders", {
+      // 2. Tạo link thanh toán VNPay cho đơn vừa tạo
+      try {
+        const payment = await apiFetch<{ payUrl: string }>("/payments", {
           method: "POST",
-          body: JSON.stringify({
-            items: items.map((item) => ({
-              productId: item.productId,
-              size: item.size,
-              toppingIds: item.toppingIds,
-              quantity: item.quantity,
-            })),
-            ...(appliedPromotionCode
-              ? { promotionCode: appliedPromotionCode }
-              : {}),
-          }),
+          headers: { "Idempotency-Key": crypto.randomUUID() },
+          body: JSON.stringify({ orderId: order.id, method }),
         });
 
-        if (!order.id) {
-          throw new Error("API tạo đơn không trả về order id.");
-        }
-        orderId = order.id;
-        setPendingOrderId(order.id);
+        // 3. Sang trang VNPay (KHÔNG xoá giỏ ở đây, không tắt loading)
+        window.location.href = payment.payUrl;
+      } catch {
+        // Đơn đã tạo nhưng chưa lấy được link
+        setError(
+          "Chưa tạo được thanh toán VNPay. Bạn có thể thanh toán tiếp trong trang đơn hàng."
+        );
+        setPendingLink(`/orders/${order.id}`);
+        setLoading(false);
       }
-
-      if (orderId === null) {
-        throw new Error("Không xác định được mã đơn hàng.");
-      }
-      
-      const payment = await apiFetch<PaymentResponse>(
-  "/payments",
-  {
-    method: "POST",
-    headers: {
-      "Idempotency-Key": idempotencyKey,
-    },
-    body: JSON.stringify({
-      orderId: orderId,
-      method,
-      ...(simulateFail
-        ? {
-            simulate: "fail",
-          }
-        : {}),
-    }),
-  }
-);
-
-if (payment.status !== "SUCCESS") {
-  throw new Error("Thanh toán thất bại. Hãy thử lại.");
-}
-
-      // Thành công: quên đơn đang chờ, xoá giỏ, sang trang xác nhận
-      setPendingOrderId(null);
-      clear();
-
-      router.push(`/orders/${orderId}`);
     } catch (err) {
-      // CỐ Ý không clear giỏ khi có lỗi.
+      // Lỗi tạo đơn (vd: thiếu nguyên liệu) → ở lại trang, giữ giỏ
       setError(
         err instanceof Error
           ? err.message
           : "Có lỗi xảy ra khi thanh toán."
       );
-    } finally {
       setLoading(false);
     }
   }
@@ -223,14 +211,14 @@ if (payment.status !== "SUCCESS") {
   if (items.length === 0) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-10">
-        <div className="rounded-2xl border border-neutral-700 bg-neutral-950 p-8 text-center">
+        <div className="rounded-2xl border border-stone-200 bg-white p-8 text-center">
           <div className="mb-4 text-5xl">🛒</div>
 
           <h1 className="text-2xl font-bold">
             Không có sản phẩm để thanh toán
           </h1>
 
-          <p className="mt-2 text-neutral-400">
+          <p className="mt-2 text-stone-500">
             Hãy thêm đồ uống vào giỏ hàng trước.
           </p>
 
@@ -258,20 +246,34 @@ if (payment.status !== "SUCCESS") {
         Thanh toán
       </h1>
 
-      <p className="mt-2 text-neutral-400">
+      <p className="mt-2 text-stone-500">
         Kiểm tra đơn hàng và chọn phương thức thanh toán.
       </p>
+
+            {pendingOrder && (
+        <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          Bạn đang có đơn {pendingOrder.code ?? `#${pendingOrder.id}`} chờ
+          thanh toán.{" "}
+          <Link
+            href={`/orders/${pendingOrder.id}`}
+            className="font-semibold underline"
+          >
+            Tiếp tục thanh toán
+          </Link>{" "}
+          · Đặt đơn mới sẽ tự hủy đơn cũ.
+        </div>
+      )}
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_360px]">
         {/* LEFT */}
         <section className="space-y-6">
           {/* ITEMS */}
-          <div className="rounded-2xl border border-neutral-700 p-5">
+          <div className="rounded-2xl border border-stone-200 bg-white p-5">
             <h2 className="text-xl font-bold">
               Đơn hàng của bạn
             </h2>
 
-            <div className="mt-4 divide-y divide-neutral-800">
+            <div className="mt-4 divide-y divide-stone-200">
               {items.map((item) => (
                 <div
                   key={`${item.productId}-${item.size}-${item.toppingIds
@@ -285,17 +287,17 @@ if (payment.status !== "SUCCESS") {
                       {item.name}
                     </h3>
 
-                    <p className="mt-1 text-sm text-neutral-400">
+                    <p className="mt-1 text-sm text-stone-500">
                       Size {item.size}
                     </p>
 
                     {item.toppings.length > 0 && (
-                      <p className="mt-1 text-sm text-neutral-400">
+                      <p className="mt-1 text-sm text-stone-500">
                         {item.toppings.join(", ")}
                       </p>
                     )}
 
-                    <p className="mt-1 text-sm text-neutral-400">
+                    <p className="mt-1 text-sm text-stone-500">
                       Số lượng: {item.quantity}
                     </p>
                   </div>
@@ -311,12 +313,12 @@ if (payment.status !== "SUCCESS") {
           </div>
 
           {/* PROMOTION */}
-          <div className="rounded-2xl border border-neutral-700 p-5">
+          <div className="rounded-2xl border border-stone-200 bg-white p-5">
             <h2 className="text-xl font-bold">
               Mã giảm giá
             </h2>
 
-            <p className="mt-1 text-sm text-neutral-400">
+            <p className="mt-1 text-sm text-stone-500">
               Nhập mã khuyến mãi nếu bạn có.
             </p>
 
@@ -329,7 +331,7 @@ if (payment.status !== "SUCCESS") {
                   setPromotionError(null);
                 }}
                 placeholder="Ví dụ: GIAM10"
-                className="min-w-0 flex-1 rounded-xl border border-neutral-700 bg-transparent px-4 py-3 outline-none focus:border-amber-600"
+                className="min-w-0 flex-1 rounded-xl border border-stone-200 bg-transparent px-4 py-3 outline-none focus:border-amber-600"
               />
 
               <button
@@ -345,13 +347,13 @@ if (payment.status !== "SUCCESS") {
             </div>
 
             {promotionError && (
-              <p className="mt-3 text-sm text-red-500">
+              <p className="mt-3 text-sm text-red-700">
                 {promotionError}
               </p>
             )}
 
             {appliedPromotionCode && discount > 0 && (
-              <p className="mt-3 text-sm font-medium text-green-500">
+              <p className="mt-3 text-sm font-medium text-green-700">
                 Đã áp dụng mã {appliedPromotionCode}: giảm{" "}
                 {formatPrice(discount)}
               </p>
@@ -359,13 +361,13 @@ if (payment.status !== "SUCCESS") {
           </div>
 
           {/* PAYMENT METHOD */}
-          <div className="rounded-2xl border border-neutral-700 p-5">
+          <div className="rounded-2xl border border-stone-200 bg-white p-5">
             <h2 className="text-xl font-bold">
               Phương thức thanh toán
             </h2>
 
             <div className="mt-4 space-y-3">
-              <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-neutral-700 p-4">
+              <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-stone-200 p-4">
                 <input
                   type="radio"
                   name="paymentMethod"
@@ -376,10 +378,13 @@ if (payment.status !== "SUCCESS") {
 
                 <span>
                   <strong>Ví điện tử</strong>
+                  <span className="mt-0.5 block text-sm text-stone-500">
+                    Chọn ví hoặc ứng dụng trên trang VNPay
+                  </span>
                 </span>
               </label>
 
-              <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-neutral-700 p-4">
+              <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-stone-200 p-4">
                 <input
                   type="radio"
                   name="paymentMethod"
@@ -389,48 +394,38 @@ if (payment.status !== "SUCCESS") {
                 />
 
                 <span>
-                  <strong>Thẻ</strong>
+                  <strong>Thẻ ngân hàng</strong>
+                  <span className="mt-0.5 block text-sm text-stone-500">
+                    Thẻ ATM nội địa qua VNPay
+                  </span>
                 </span>
               </label>
             </div>
-
-            <label className="mt-5 flex cursor-pointer items-center gap-3 text-sm text-neutral-400">
-              <input
-                type="checkbox"
-                checked={simulateFail}
-                onChange={(event) =>
-                  setSimulateFail(event.target.checked)
-                }
-              />
-
-              Giả lập thanh toán lỗi
-            </label>
           </div>
         </section>
 
         {/* SUMMARY */}
-        <aside className="h-fit rounded-2xl border border-neutral-700 p-5 lg:sticky lg:top-6">
-          <h2 className="text-xl font-bold">
+        <aside className="h-fit rounded-2xl border border-stone-200 bg-white p-5 lg:sticky lg:top-6">          <h2 className="text-xl font-bold">
             Tóm tắt thanh toán
           </h2>
-          <p className="mt-2 text-sm text-neutral-400">
+          <p className="mt-2 text-sm text-stone-500">
              Điểm thưởng hiện có: {loyaltyPoints}
            </p>
 
           <div className="mt-5 space-y-3">
-            <div className="flex justify-between text-neutral-400">
+            <div className="flex justify-between text-stone-500">
               <span>Tạm tính</span>
               <span>{formatPrice(totalPrice)}</span>
             </div>
 
-            <div className="flex justify-between text-neutral-400">
+            <div className="flex justify-between text-stone-500">
               <span>Giảm giá</span>
               <span>
                 -{formatPrice(discount)}
               </span>
             </div>
 
-            <div className="border-t border-neutral-700 pt-4">
+            <div className="border-t border-stone-200 pt-4">
               <div className="flex items-center justify-between">
                 <strong>Tổng thanh toán</strong>
 
@@ -442,8 +437,16 @@ if (payment.status !== "SUCCESS") {
           </div>
 
           {error && (
-            <div className="mt-5 rounded-xl border border-red-900 bg-red-950/30 p-3 text-sm text-red-400">
+            <div className="mt-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
               {error}
+              {pendingLink && (
+                <Link
+                  href={pendingLink}
+                  className="mt-2 block font-semibold underline"
+                >
+                  Xem đơn hàng
+                </Link>
+              )}
             </div>
           )}
 
@@ -454,12 +457,12 @@ if (payment.status !== "SUCCESS") {
             className="mt-6 w-full rounded-xl bg-amber-700 px-4 py-3 font-bold text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading
-              ? "Đang xử lý..."
-              : "Xác nhận thanh toán"}
+              ? "Đang chuyển sang VNPay…"
+              : `Thanh toán ${formatPrice(finalTotal)}`}
           </button>
 
-          <p className="mt-3 text-center text-xs text-neutral-500">
-            Không đóng trang trong lúc đang xử lý thanh toán.
+          <p className="mt-3 text-center text-xs text-stone-500">
+            Bạn sẽ được chuyển sang trang thanh toán VNPay (môi trường thử nghiệm, không trừ tiền thật).
           </p>
         </aside>
       </div>
