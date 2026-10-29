@@ -40,25 +40,28 @@ export default function Navbar() {
 
   return (
     <header className="sticky top-0 z-50 border-b bg-white">
-      <nav className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-        <Link href="/" className="text-xl font-bold text-amber-900">
+      <nav className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-3 py-3 sm:gap-3 sm:px-6">
+        <Link href="/" className="shrink-0 text-xl font-bold text-amber-900">
           BrewLite
         </Link>
 
-        <div className="flex items-center gap-3 text-sm sm:gap-5">
-          <Link href="/" className="hover:text-amber-700">
+        <div className="flex items-center gap-2 whitespace-nowrap text-sm sm:gap-5">
+          {/* Điện thoại: ẩn "Menu" vì bấm logo cũng về Menu */}
+          <Link href="/" className="hidden hover:text-amber-700 sm:inline">
             Menu
           </Link>
 
           {isClient && user && (
-            <Link href="/orders" className="hover:text-amber-700">
-              Lịch sử đơn
+            <Link href="/orders" aria-label="Lịch sử đơn" className="hover:text-amber-700">
+              <span className="sm:hidden">Đơn</span>
+              <span className="hidden sm:inline">Lịch sử đơn</span>
             </Link>
           )}
 
           {isClient && user?.role === "STAFF" && (
-            <Link href="/staff" className="hover:text-amber-700">
-              Quản lý đơn
+            <Link href="/staff" aria-label="Quản lý đơn" className="hover:text-amber-700">
+              <span className="sm:hidden">Quản lý</span>
+              <span className="hidden sm:inline">Quản lý đơn</span>
             </Link>
           )}
 
@@ -84,7 +87,7 @@ export default function Navbar() {
               {isCustomer && (
                 <span
                   title="Điểm thưởng tích luỹ"
-                  className="whitespace-nowrap rounded-full bg-amber-100 px-2 py-1 font-medium text-amber-900"
+                  className="rounded-full bg-amber-100 px-2 py-1 font-medium text-amber-900"
                 >
                   ⭐ {user.loyaltyPoints ?? 0}
                   <span className="hidden sm:inline"> điểm</span>
@@ -93,9 +96,11 @@ export default function Navbar() {
               <button
                 type="button"
                 onClick={handleLogout}
-                className="rounded-lg border px-3 py-2 hover:bg-stone-100"
+                aria-label="Đăng xuất"
+                className="rounded-lg border px-2 py-2 hover:bg-stone-100 sm:px-3"
               >
-                Đăng xuất
+                <span className="sm:hidden">Thoát</span>
+                <span className="hidden sm:inline">Đăng xuất</span>
               </button>
             </>
           ) : (
