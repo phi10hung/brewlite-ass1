@@ -816,18 +816,42 @@ describe('PaymentsService', () => {
     await expect(service.handleReturn({})).rejects.toThrow(BadRequestException);
   });
 
-  it('handleReturn: hỏi lại VNPay rồi applyResult', async () => {
-    prismaMock.payment.findUnique.mockResolvedValue(payment());
-    const applySpy = jest.spyOn(service, 'applyResult').mockResolvedValue({
+  // Query VNPay trả về khi khách quay lại (đã có chữ ký, số tiền 50.000đ)
+  function returnQuery(responseCode: string, transactionStatus: string) {
+    return {
+      vnp_TxnRef: 'BL7K2M9QX4P2AB',
+      vnp_Amount: '5000000',
+      vnp_ResponseCode: responseCode,
+      vnp_TransactionStatus: transactionStatus,
+      vnp_TransactionNo: '15716735',
+      vnp_PayDate: '20261028000611',
+    };
+  }
+
+  function queryResult(responseCode: string, transactionStatus: string) {
+    return {
+      responseCode,
+      transactionStatus,
+      transactionNo: responseCode === '00' ? 'VNP123' : '',
+      payDate: responseCode === '00' ? '20261027230000' : '',
+      message: responseCode === '99' ? 'Unexpected error' : 'ok',
+      raw: {},
+    };
+  }
+
+  function spyApply() {
+    return jest.spyOn(service, 'applyResult').mockResolvedValue({
       orderId: 10,
       orderStatus: 'PAID',
       success: true,
     });
+  }
 
-    const result = await service.handleReturn(
-      { vnp_TxnRef: 'BL7K2M9QX4P2AB' },
-      '1.2.3.4',
-    );
+  it('handleReturn: hỏi lại VNPay rồi applyResult', async () => {
+    prismaMock.payment.findUnique.mockResolvedValue(payment());
+    const applySpy = spyApply();
+
+    const result = await service.handleReturn(returnQuery('00', '00'), '1.2.3.4');
 
     expect(vnpayMock.queryTransaction).toHaveBeenCalledWith({
       txnRef: 'BL7K2M9QX4P2AB',
@@ -836,53 +860,92 @@ describe('PaymentsService', () => {
     });
     expect(applySpy).toHaveBeenCalledWith(
       payment(),
-      expect.anything(),
+      expect.objectContaining({ transactionNo: 'VNP123' }),
       'SUCCESS',
     );
-    expect(result).toEqual({
-      orderId: 10,
-      orderStatus: 'PAID',
-      success: true,
-    });
+    expect(result).toEqual({ orderId: 10, orderStatus: 'PAID', success: true });
   });
 
-  it('handleReturn querydr 00 + 01 nhưng khách hủy: applyResult FAILED', async () => {
+  it('handleReturn: VNPay tra cứu lỗi 99 nhưng Return URL báo 00/00 → SUCCESS theo Return URL', async () => {
     prismaMock.payment.findUnique.mockResolvedValue(payment());
-    vnpayMock.queryTransaction.mockResolvedValue({
-      responseCode: '00',
-      transactionStatus: '01',
-      transactionNo: '',
-      payDate: '',
-      message: 'pending',
-      raw: {},
-    });
-    const applySpy = jest.spyOn(service, 'applyResult').mockResolvedValue({
-      orderId: 10,
-      orderStatus: 'PAYMENT_FAILED',
-      success: false,
-    });
+    vnpayMock.queryTransaction.mockResolvedValue(queryResult('99', ''));
+    const applySpy = spyApply();
 
-    const result = await service.handleReturn(
-      {
-        vnp_TxnRef: 'BL7K2M9QX4P2AB',
-        vnp_ResponseCode: '24',
-      },
-      '1.2.3.4',
-    );
+    await service.handleReturn(returnQuery('00', '00'));
 
     expect(applySpy).toHaveBeenCalledWith(
       payment(),
       expect.objectContaining({
         responseCode: '00',
-        transactionStatus: '01',
+        transactionStatus: '00',
+        transactionNo: '15716735',
+        payDate: '20261028000611',
       }),
+      'SUCCESS',
+    );
+  });
+
+  it('handleReturn: không gọi được VNPay (lỗi mạng) nhưng Return URL báo 00/00 → SUCCESS', async () => {
+    prismaMock.payment.findUnique.mockResolvedValue(payment());
+    vnpayMock.queryTransaction.mockRejectedValue(new Error('network'));
+    const applySpy = spyApply();
+
+    await service.handleReturn(returnQuery('00', '00'));
+
+    expect(applySpy).toHaveBeenCalledWith(
+      payment(),
+      expect.objectContaining({ transactionNo: '15716735' }),
+      'SUCCESS',
+    );
+  });
+
+  it('handleReturn: VNPay chưa kịp ghi nhận (00 + 01) nhưng Return URL báo 00/00 → SUCCESS', async () => {
+    prismaMock.payment.findUnique.mockResolvedValue(payment());
+    vnpayMock.queryTransaction.mockResolvedValue(queryResult('00', '01'));
+    const applySpy = spyApply();
+
+    await service.handleReturn(returnQuery('00', '00'));
+
+    expect(applySpy).toHaveBeenCalledWith(payment(), expect.anything(), 'SUCCESS');
+  });
+
+  it('handleReturn: VNPay trả lời rõ là lỗi (00 + 02) thì theo VNPay → FAILED', async () => {
+    prismaMock.payment.findUnique.mockResolvedValue(payment());
+    vnpayMock.queryTransaction.mockResolvedValue(queryResult('00', '02'));
+    const applySpy = spyApply();
+
+    await service.handleReturn(returnQuery('00', '00'));
+
+    expect(applySpy).toHaveBeenCalledWith(
+      payment(),
+      expect.objectContaining({ transactionStatus: '02' }),
       'FAILED',
     );
-    expect(result).toEqual({
-      orderId: 10,
-      orderStatus: 'PAYMENT_FAILED',
-      success: false,
-    });
+  });
+
+  it('handleReturn: khách hủy trên VNPay (24), VNPay chưa ghi nhận → FAILED', async () => {
+    prismaMock.payment.findUnique.mockResolvedValue(payment());
+    vnpayMock.queryTransaction.mockResolvedValue(queryResult('00', '01'));
+    const applySpy = spyApply();
+
+    await service.handleReturn(returnQuery('24', '02'));
+
+    expect(applySpy).toHaveBeenCalledWith(
+      payment(),
+      expect.objectContaining({ responseCode: '24' }),
+      'FAILED',
+    );
+  });
+
+  it('handleReturn: số tiền trên Return URL không khớp đơn → BadRequest, không đổi gì', async () => {
+    prismaMock.payment.findUnique.mockResolvedValue(payment());
+    const applySpy = spyApply();
+
+    await expect(
+      service.handleReturn({ ...returnQuery('00', '00'), vnp_Amount: '100' }),
+    ).rejects.toThrow(BadRequestException);
+    expect(applySpy).not.toHaveBeenCalled();
+    expect(vnpayMock.queryTransaction).not.toHaveBeenCalled();
   });
 
   it('handleIpn sai chữ ký: trả 97', async () => {
