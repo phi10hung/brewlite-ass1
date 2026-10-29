@@ -4,7 +4,11 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime, formatVnd } from "@/lib/format";
-import { getOrderStatus, getRefundLabel, type RefundStatus, } from "@/lib/order-status"; 
+import {
+  getOrderStatus,
+  getRefundLabel,
+  type RefundStatus,
+} from "@/lib/order-status";
 
 interface Order {
   id: number;
@@ -114,7 +118,7 @@ export default function OrdersPage() {
         <div className="mt-8 space-y-4">
           {orders.map((order) => {
             const status = getOrderStatus(order.status);
-            const refundLabel = getRefundLabel(order.refundStatus); 
+            const refundLabel = getRefundLabel(order.refundStatus);
 
             return (
               <Link
@@ -135,29 +139,18 @@ export default function OrdersPage() {
                     </p>
                   </div>
 
-                  <div className="flex flex-col items-end gap-1"> 
-
-                    <span 
-
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${status.className}`} 
-
-                    > 
-
-                      {status.label} 
-
-                    </span> 
-
-                    {refundLabel && ( 
-
-                      <span className="text-xs font-medium text-stone-500"> 
-
-                        {refundLabel} 
-
-                      </span> 
-
-                    )} 
-
-                  </div> 
+                  <div className="flex flex-col items-end gap-1">
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${status.className}`}
+                    >
+                      {status.label}
+                    </span>
+                    {refundLabel && (
+                      <span className="text-xs font-medium text-stone-500">
+                        {refundLabel}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="mt-4 flex items-center justify-between border-t pt-4">
