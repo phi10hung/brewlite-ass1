@@ -39,7 +39,7 @@ npx prisma db seed
 npm run start:dev
 ```
 - `npx prisma migrate dev`: tạo các bảng trong database
-- `npx prisma db seed`: thêm dữ liệu mẫu (14 đồ uống, 9 topping, 2 mã giảm giá, 2 tài khoản test)
+- `npx prisma db seed`: thêm dữ liệu mẫu (14 đồ uống, 9 topping, 22 nguyên liệu kèm công thức pha chế, 2 mã giảm giá, 2 tài khoản test)
 - Kiểm tra kết nối database: http://localhost:4000/health → `{"status":"ok","database":"up"}`
 - Xem dữ liệu trực quan: `npx prisma studio`
 
@@ -78,6 +78,40 @@ docker compose --profile app up --build -d
 - Sửa code xong muốn cập nhật: chạy lại `docker compose --profile app up --build -d`
 
 > Khi code hằng ngày vẫn dùng `docker compose up -d` (chỉ bật database) và chạy backend, frontend bằng `npm` như phần **Chạy local**. Không bật hai cách cùng lúc vì trùng cổng 3000, 4000.
+
+## Thanh toán VNPay Sandbox
+Thanh toán qua cổng **VNPay môi trường thử nghiệm** (Sandbox): trang thanh toán thật của VNPay nhưng dùng tiền ảo, không trừ tiền thật.
+
+### Cấu hình
+Điền khoá vào `backend/.env` (và `.env` ở thư mục gốc nếu chạy bằng Docker). Khoá xin trưởng nhóm, **không commit, không gửi lên nhóm chung**.
+
+| Biến | Ý nghĩa |
+|---|---|
+| `VNP_TMN_CODE` | Mã website VNPay cấp |
+| `VNP_HASH_SECRET` | Khoá bí mật để ký và kiểm tra chữ ký |
+| `VNP_PAY_URL` | Trang thanh toán Sandbox (giữ như `.env.example`) |
+| `VNP_API_URL` | API tra cứu, hoàn tiền Sandbox (giữ như `.env.example`) |
+| `VNP_RETURN_URL` | Trang VNPay đưa khách về: `http://localhost:3000/payment/result` |
+| `ORDER_PAYMENT_MINUTES` | Số phút được giữ đơn chờ thanh toán (mặc định 5) |
+
+Chưa có khoá thì backend vẫn chạy, chỉ phần thanh toán báo "Chưa cấu hình thanh toán VNPay".
+
+### Luồng thanh toán
+1. Checkout bấm **Thanh toán** → tạo đơn (giữ nguyên liệu 5 phút) → chuyển sang trang VNPay.
+2. Trên VNPay chọn **Thẻ nội địa** → ngân hàng **NCB** → nhập thẻ test (hỏi trưởng nhóm) → nhập OTP.
+3. VNPay đưa về `/payment/result`: backend kiểm tra chữ ký, số tiền và hỏi lại VNPay.
+   - Thành công: đơn **Đã thanh toán**, xoá giỏ, cộng điểm ⭐, 3 giây sau tự sang trang đơn hàng.
+   - Không thành công: chọn **Thanh toán lại**, **Hủy đơn** hoặc **Về giỏ hàng** (giỏ vẫn giữ nguyên).
+4. Đơn chưa trả có thể thanh toán tiếp ở trang chi tiết đơn trong 5 phút.
+
+### Tự động
+- **Tự hủy đơn quá hạn:** mỗi 30 giây backend tìm đơn Chờ thanh toán / Thanh toán lỗi đã quá hạn, hỏi lại VNPay rồi hủy và trả nguyên liệu về kho.
+- **Hoàn tiền:** khách hoặc nhân viên hủy đơn Đã thanh toán thì hoàn tiền qua VNPay và trừ lại điểm. Hoàn tiền lỗi thì đơn hiện "Đang hoàn tiền", mỗi phút backend thử lại.
+- Khách trả xong nhưng quay về sau khi đơn đã bị tự hủy: đơn giữ trạng thái Đã hủy và tiền được hoàn lại.
+
+### Lưu ý
+- Sandbox **không dùng được VNPAY-QR** (ứng dụng ngân hàng thật không quét mã thử nghiệm), hãy chọn Thẻ nội địa.
+- API tra cứu, hoàn tiền của Sandbox đôi khi báo lỗi `99 Unexpected error`: thanh toán vẫn được xác nhận bằng kết quả VNPay gửi về (đã kiểm tra chữ ký và số tiền); hoàn tiền thì được thử lại tự động.
 
 ## Thành viên và phân công
 | Thành viên | Vai trò | Task đảm nhận |
