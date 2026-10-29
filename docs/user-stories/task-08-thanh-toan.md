@@ -17,3 +17,4 @@ Là **khách hàng đã đăng nhập**, tôi muốn thanh toán đơn hàng b�
 - [x] Có unit test cho thanh toán thành công và thanh toán thất bại
 - [x] Khách đang thanh toán trên VNPay (chưa có kết quả) thì đơn giữ nguyên "Chờ thanh toán", hệ thống hỏi lại sau
 - [x] Backend vẫn chạy khi chưa cấu hình khoá VNPay; chỉ chức năng thanh toán báo "Chưa cấu hình thanh toán VNPay"
+- [x] Khi API tra cứu của VNPay lỗi hoặc chưa ghi nhận, kết quả trên trang trả về (đã kiểm tra chữ ký và số tiền) vẫn được dùng: trả thành công thì đơn Đã thanh toán ngay, không bị kẹt chờ
