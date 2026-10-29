@@ -346,25 +346,41 @@ export class PaymentsService {
       throw new NotFoundException('Không tìm thấy thanh toán');
     }
 
-    // Không tin kết quả trên Return URL; hỏi lại VNPay trước khi cập nhật đơn.
-    const result = await this.vnpay.queryTransaction({
-      txnRef,
-      transactionDate: payment.createdAt,
-      ipAddr,
-    });
-
-    let kind = kindFromQuery(result);
-    const callbackResponseCode = readQueryString(query, 'vnp_ResponseCode');
-    if (
-      kind === 'PENDING' &&
-      callbackResponseCode !== undefined &&
-      callbackResponseCode !== '00'
-    ) {
-      // Khách vừa hủy trên VNPay, querydr có thể chưa kịp ghi nhận.
-      kind = 'FAILED';
+    // Kết quả VNPay gửi kèm trên Return URL (chữ ký đã kiểm tra ở trên)
+    const callback: VnpayPaymentResult = {
+      responseCode: readQueryString(query, 'vnp_ResponseCode') ?? '',
+      transactionStatus: readQueryString(query, 'vnp_TransactionStatus') ?? '',
+      transactionNo: readQueryString(query, 'vnp_TransactionNo') ?? '',
+      payDate: readQueryString(query, 'vnp_PayDate') ?? '',
+    };
+    const amount = Number(readQueryString(query, 'vnp_Amount'));
+    if (amount !== payment.amount * 100) {
+      throw new BadRequestException('Số tiền VNPay không khớp với đơn hàng');
     }
 
-    return this.applyResult(payment, result, kind);
+    // Ưu tiên hỏi lại VNPay: VNPay trả lời rõ thành công / thất bại thì theo VNPay.
+    let queried: VnpayPaymentResult | null = null;
+    try {
+      queried = await this.vnpay.queryTransaction({
+        txnRef,
+        transactionDate: payment.createdAt,
+        ipAddr,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Không truy vấn được VNPay cho ${txnRef}: ${this.errorMessage(error)}`,
+      );
+    }
+    if (queried) {
+      const kind = kindFromQuery(queried);
+      if (kind !== 'PENDING') {
+        return this.applyResult(payment, queried, kind);
+      }
+    }
+
+    // VNPay lỗi (vd mã 99) hoặc chưa kịp ghi nhận: dùng kết quả trên Return URL.
+    // Chữ ký tạo bằng khoá bí mật của quán nên kết quả này không giả được.
+    return this.applyResult(payment, callback, kindFromCallback(callback));
   }
 
   async handleIpn(query: Record<string, unknown>): Promise<IpnResponse> {
