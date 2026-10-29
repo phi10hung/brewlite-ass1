@@ -164,6 +164,7 @@
 |  |  | Chỉnh sửa | VNPay tra cứu lỗi, chưa ghi nhận hoặc gọi không được thì dùng kết quả trên trang trả về (đã kiểm tra chữ ký); kiểm tra số tiền khớp đơn; unit test, User Story | Triệu | #85, PR #89 |
 |  |  | Chỉnh sửa | Chạy thử PR #89 bằng kết quả VNPay có chữ ký thật lúc VNPay tra cứu đang lỗi: trả thành công → Đã thanh toán, gửi lại không cộng điểm 2 lần, sửa số tiền → báo lỗi 400, khách hủy → Thanh toán lỗi; duyệt và merge | Hùng | PR #89 |
 |  |  | Bổ sung | Trang kết quả thanh toán /payment/result (thành công: xoá giỏ, cập nhật điểm, tự sang trang đơn; không thành công: Thanh toán lại, Hủy đơn, Về giỏ hàng); tác vụ nền tự hủy đơn quá hạn 5 phút (trả nguyên liệu) và thử lại hoàn tiền bị lỗi; unit test, README VNPay, User Story | Hùng | #78, PR #92 |
+|  |  | Chỉnh sửa | Review và merge PR #92 vào develop | Quang | PR #92 |
 
 ## Task 9 – Xác nhận, lịch sử đơn và bàn giao
 
