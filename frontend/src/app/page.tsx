@@ -116,26 +116,38 @@ export default function MenuPage() {
           </div>
 
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
-            {shown.map((p) => (
-              <Link
-                key={p.id}
-                href={`/products/${p.id}`}
-                className="overflow-hidden rounded-lg border bg-white shadow-sm hover:shadow-md"
-              >
-                {p.imageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={p.imageUrl} alt={p.name} className="aspect-square w-full object-cover" />
-                ) : (
-                  <div className="flex aspect-square w-full items-center justify-center bg-amber-50 text-4xl">
-                    {getIcon(p)}
+                        {shown.map((p) => {
+              const soldOut = p.stock === 0;
+              return (
+                <Link
+                  key={p.id}
+                  href={`/products/${p.id}`}
+                  className={`overflow-hidden rounded-lg border bg-white shadow-sm hover:shadow-md ${
+                    soldOut ? 'opacity-60' : ''
+                  }`}
+                >
+                  <div className="relative">
+                    {p.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={p.imageUrl} alt={p.name} className="aspect-square w-full object-cover" />
+                    ) : (
+                      <div className="flex aspect-square w-full items-center justify-center bg-amber-50 text-4xl">
+                        {getIcon(p)}
+                      </div>
+                    )}
+                    {soldOut && (
+                      <span className="absolute left-2 top-2 rounded bg-red-600 px-2 py-1 text-xs font-semibold text-white">
+                        Hết món
+                      </span>
+                    )}
                   </div>
-                )}
-                <div className="p-3">
-                  <h2 className="font-semibold">{p.name}</h2>
-                  <p className="text-amber-700">{formatVnd(p.price)}</p>
-                </div>
-              </Link>
-            ))}
+                  <div className="p-3">
+                    <h2 className="font-semibold">{p.name}</h2>
+                    <p className="text-amber-700">{formatVnd(p.price)}</p>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         </>
       )}

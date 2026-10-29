@@ -1,9 +1,11 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { OrderStatus } from '../generated/prisma/enums';
+import { OrdersService } from '../orders/orders.service';
 import { assertTransition } from '../orders/order-status';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -22,7 +24,10 @@ const ORDER_INCLUDE = {
 
 @Injectable()
 export class StaffService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ordersService: OrdersService,
+  ) {}
 
   // Đơn mới nhất trước, lọc theo trạng thái nếu có
   listOrders(status?: OrderStatus) {
@@ -32,7 +37,14 @@ export class StaffService {
       include: ORDER_INCLUDE,
     });
   }
-
+  // Kho nguyên liệu cho nhân viên xem, sắp theo tên
+  listIngredients() {
+    return this.prisma.ingredient.findMany({
+      select: { id: true, name: true, unit: true, stock: true },
+      orderBy: { name: 'asc' },
+    });
+  }
+  
   async updateStatus(id: number, status: OrderStatus) {
     const order = await this.prisma.order.findUnique({ where: { id } });
     if (!order) {
@@ -43,10 +55,30 @@ export class StaffService {
         'Nhân viên không được chuyển đơn sang trạng thái này',
       );
     }
+
+    // Hủy: chỉ đơn Đã thanh toán, đi qua hàm hủy chung (trả nguyên liệu, trừ điểm, hoàn tiền)
+    if (status === OrderStatus.CANCELLED) {
+      if (order.status !== OrderStatus.PAID) {
+        throw new BadRequestException('Chỉ hủy được đơn đã thanh toán');
+      }
+      await this.ordersService.cancel(id, 'STAFF');
+      return this.prisma.order.findUniqueOrThrow({
+        where: { id },
+        include: ORDER_INCLUDE,
+      });
+    }
+
     assertTransition(order.status, status);
-    return this.prisma.order.update({
-      where: { id },
+    // Chỉ đổi khi trạng thái vẫn như lúc đọc, bấm trùng thì count = 0
+    const result = await this.prisma.order.updateMany({
+      where: { id, status: order.status },
       data: { status },
+    });
+    if (result.count === 0) {
+      throw new ConflictException('Đơn vừa đổi trạng thái, vui lòng tải lại');
+    }
+    return this.prisma.order.findUniqueOrThrow({
+      where: { id },
       include: ORDER_INCLUDE,
     });
   }

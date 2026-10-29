@@ -1,9 +1,9 @@
 # User Story – Task 3: Trang Menu
 
-**Người viết:** Búp · **Issue:** #5 · **Sprint:** 1
+**Người viết:** Búp · **Issue:** #5 · **Sprint:** 1 (cập nhật Sprint 3, #80)
 
 **Là** khách hàng,
-**tôi muốn** xem danh sách đồ uống kèm hình và giá, lọc được theo loại đồ uống,
+**tôi muốn** xem danh sách đồ uống kèm hình và giá, lọc được theo loại đồ uống, biết món nào đã hết,
 **để** chọn món nhanh mà không phải xếp hàng hỏi nhân viên.
 
 **Tiêu chí chấp nhận**
@@ -14,5 +14,6 @@
 - [x] Xem tốt trên điện thoại (2 cột) và máy tính (3–4 cột)
 - [x] Bấm vào một món thì chuyển sang trang chi tiết món đó
 - [x] Dữ liệu món (tên, giá, hình, danh mục) lấy từ API `GET /products`
+- [x] Món không còn đủ nguyên liệu để pha thì hiện nhãn "Hết món" trên thẻ món
 
-**Ghi chú:** dữ liệu lấy từ API `GET /products` (14 món trong dữ liệu mẫu), hình lấy từ `imageUrl` do API trả về. Đã bỏ dữ liệu giả.
+**Ghi chú:** dữ liệu lấy từ API `GET /products` (14 món trong dữ liệu mẫu), hình lấy từ `imageUrl` do API trả về. Đã bỏ dữ liệu giả. Nhãn "Hết món" dựa trên tồn kho nguyên liệu thật.
