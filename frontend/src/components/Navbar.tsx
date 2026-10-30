@@ -17,6 +17,7 @@ export default function Navbar() {
   const router = useRouter();
   const isClient = useIsClient();
   const cartCount = useCartStore((s) => s.totalItems());
+  const clearCart = useCartStore((s) => s.clear);
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const setLoyaltyPoints = useAuthStore((s) => s.setLoyaltyPoints);
@@ -33,7 +34,9 @@ export default function Navbar() {
       });
   }, [cartCount, isCustomer, setLoyaltyPoints]);
 
+  // Xoá giỏ khi tự đăng xuất để người sau không thấy giỏ của mình
   function handleLogout() {
+    clearCart();
     logout();
     router.replace("/");
   }
