@@ -89,7 +89,16 @@ describe('StaffService.updateStatus', () => {
 
     await expect(
       service.updateStatus(1, OrderStatus.CANCELLED),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    ).rejects.toThrow('Đơn đã nhận pha, không hủy được nữa');
+    expect(cancel).not.toHaveBeenCalled();
+  });
+
+  it('hủy đơn chưa thanh toán thì báo chỉ hủy được đơn đã thanh toán', async () => {
+    findUnique.mockResolvedValue({ id: 1, status: OrderStatus.PENDING });
+
+    await expect(
+      service.updateStatus(1, OrderStatus.CANCELLED),
+    ).rejects.toThrow('Chỉ hủy được đơn đã thanh toán');
     expect(cancel).not.toHaveBeenCalled();
   });
 });

@@ -17,6 +17,13 @@ const STAFF_TARGETS: readonly OrderStatus[] = [
   OrderStatus.CANCELLED,
 ];
 
+// Đơn đã qua bước Nhận đơn thì không hủy được nữa
+const AFTER_ACCEPTED: readonly OrderStatus[] = [
+  OrderStatus.PREPARING,
+  OrderStatus.READY,
+  OrderStatus.COMPLETED,
+];
+
 const ORDER_INCLUDE = {
   user: { select: { id: true, name: true } },
   items: true,
@@ -59,7 +66,11 @@ export class StaffService {
     // Hủy: chỉ đơn Đã thanh toán, đi qua hàm hủy chung (trả nguyên liệu, trừ điểm, hoàn tiền)
     if (status === OrderStatus.CANCELLED) {
       if (order.status !== OrderStatus.PAID) {
-        throw new BadRequestException('Chỉ hủy được đơn đã thanh toán');
+        throw new BadRequestException(
+          AFTER_ACCEPTED.includes(order.status)
+            ? 'Đơn đã nhận pha, không hủy được nữa'
+            : 'Chỉ hủy được đơn đã thanh toán',
+        );
       }
       await this.ordersService.cancel(id, 'STAFF');
       return this.prisma.order.findUniqueOrThrow({
