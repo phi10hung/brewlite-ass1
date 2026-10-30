@@ -5,13 +5,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { apiFetch } from "@/lib/api";
+import { formatVnd } from "@/lib/format";
 import { useCartStore, type CartItem } from "@/store/cart-store";
-
-const formatPrice = (price: number) =>
-  new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-  }).format(price);
 
 const lineKey = (item: CartItem) =>
   `${item.productId}-${item.size}-${[...item.toppingIds]
@@ -149,7 +144,7 @@ export default function CartPage() {
                       : ""}
                   </p>
                   <p className="mt-2 font-medium text-amber-900">
-                    {formatPrice(item.unitPrice)}
+                    {formatVnd(item.unitPrice)}
                   </p>
 
                   <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -220,7 +215,7 @@ export default function CartPage() {
                 </div>
 
                 <p className="whitespace-nowrap text-sm font-semibold">
-                  {formatPrice(item.unitPrice * item.quantity)}
+                  {formatVnd(item.unitPrice * item.quantity)}
                 </p>
               </article>
             ))}
@@ -241,19 +236,19 @@ export default function CartPage() {
               <span className="text-stone-500">
                 Tạm tính ({items.reduce((sum, item) => sum + item.quantity, 0)} món)
               </span>
-              <span>{formatPrice(totalPrice)}</span>
+              <span>{formatVnd(totalPrice)}</span>
             </div>
 
             <div className="mt-3 flex justify-between gap-4 text-sm">
               <span className="text-stone-500">Giảm giá</span>
-              <span>{formatPrice(0)}</span>
+              <span>{formatVnd(0)}</span>
             </div>
 
             <div className="my-5 border-t border-stone-200" />
 
             <div className="flex justify-between gap-4 text-lg font-bold">
               <span>Tổng cộng</span>
-              <span className="text-amber-900">{formatPrice(totalPrice)}</span>
+              <span className="text-amber-900">{formatVnd(totalPrice)}</span>
             </div>
 
                         {overLimit ? (

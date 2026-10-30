@@ -2,6 +2,20 @@ import type { ValidationError } from 'class-validator';
 import { collectValidationMessages } from './validation-errors';
 
 describe('collectValidationMessages', () => {
+  it('trường lạ: đổi câu tiếng Anh sang tiếng Việt', () => {
+    const errors = [
+      {
+        property: 'price',
+        constraints: { whitelistValidation: 'property price should not exist' },
+        children: [],
+      },
+    ] as ValidationError[];
+
+    expect(collectValidationMessages(errors)).toEqual([
+      'Trường "price" không hợp lệ',
+    ]);
+  });
+
   it('lấy câu báo lỗi của trường lồng nhau, không kèm tiền tố', () => {
     const errors = [
       {

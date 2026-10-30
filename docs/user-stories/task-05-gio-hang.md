@@ -17,3 +17,4 @@
 - [ ] Badge số lượng trên Navbar (chờ layout của Khoa)
 - [x] Nút "+" giới hạn theo số ly còn pha được từ kho nguyên liệu (có tính nguyên liệu các món khác trong giỏ), hiện "Chỉ còn pha được X ly"
 - [x] Các món trong giỏ dùng chung nguyên liệu (kể cả topping) mà cộng lại vượt kho thì tô đỏ dòng vượt, hiện cảnh báo ở đầu cột tổng tiền, chưa cho Tiến hành thanh toán
+- [x] Bấm Đăng xuất thì giỏ hàng được xoá, người đăng nhập sau không thấy giỏ cũ; hết hạn đăng nhập thì giỏ vẫn giữ để khách đăng nhập lại mua tiếp
