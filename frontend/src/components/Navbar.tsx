@@ -48,13 +48,18 @@ export default function Navbar() {
           BrewLite
         </Link>
 
-        <div className="flex items-center gap-2 whitespace-nowrap text-sm sm:gap-5">
+        <div className="flex items-center gap-2 whitespace-nowrap text-sm sm:gap-3 lg:gap-5">
           {/* Điện thoại: ẩn "Menu" vì bấm logo cũng về Menu */}
           <Link href="/" className="hidden hover:text-amber-700 sm:inline">
             Menu
           </Link>
+          {/* Màn hình nhỏ: nhân viên ẩn Lịch sử đơn và dùng chữ ngắn để Navbar vừa 1 dòng */}
           {isClient && user && (
-            <Link href="/orders" aria-label="Lịch sử đơn" className="hover:text-amber-700">
+            <Link
+              href="/orders"
+              aria-label="Lịch sử đơn"
+              className={`hover:text-amber-700 ${user.role === "STAFF" ? "hidden lg:inline" : ""}`}
+            >
               <span className="sm:hidden">Đơn</span>
               <span className="hidden sm:inline">Lịch sử đơn</span>
             </Link>
@@ -62,18 +67,24 @@ export default function Navbar() {
 
           {isClient && user?.role === "STAFF" && (
             <Link href="/staff" aria-label="Quản lý đơn" className="hover:text-amber-700">
-              <span className="sm:hidden">Quản lý</span>
-              <span className="hidden sm:inline">Quản lý đơn</span>
+              <span className="lg:hidden">Đơn</span>
+              <span className="hidden lg:inline">Quản lý đơn</span>
             </Link>
           )}
 
           {isClient && user?.role === "STAFF" && (
             <Link href="/staff/ingredients" aria-label="Kho nguyên liệu" className="hover:text-amber-700">
-              <span className="sm:hidden">Kho</span>
-              <span className="hidden sm:inline">Kho nguyên liệu</span>
+              <span className="lg:hidden">Kho</span>
+              <span className="hidden lg:inline">Kho nguyên liệu</span>
             </Link>
           )}
-          
+
+          {isClient && user?.role === "STAFF" && (
+            <Link href="/staff/revenue" className="hover:text-amber-700">
+              Doanh thu
+            </Link>
+          )}
+
           <Link
             href="/cart"
             aria-label="Giỏ hàng"
