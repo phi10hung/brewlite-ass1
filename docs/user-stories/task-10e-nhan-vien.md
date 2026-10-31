@@ -17,6 +17,7 @@ Là **nhân viên quán**, tôi muốn xem danh sách đơn, chuyển trạng th
 - Tài khoản khách hàng gọi API nhân viên bị chặn (403) và trang hiện
   "Bạn không có quyền xem trang này".
 - Trang có trạng thái đang tải, chưa có đơn và lỗi (có nút Thử lại).
+- API nhập kho: chỉ nhân viên gọi được, chỉ cộng thêm, số lượng là số nguyên dương (sai trả 400), nguyên liệu không tồn tại trả 404; nhập xong số ly còn pha tăng theo.
 - Trang `/staff` có bảng "Kho nguyên liệu" gồm 3 cột: Tên, Tồn kho, Đơn vị. Nguyên liệu hết (tồn kho bằng 0) được tô đỏ.
 - Bảng kho có nút "Tải lại" để cập nhật số liệu, và có trạng thái đang tải, chưa có nguyên liệu, lỗi. Bảng chỉ để xem, không sửa tồn kho tại đây.
 
@@ -24,3 +25,4 @@ Là **nhân viên quán**, tôi muốn xem danh sách đơn, chuyển trạng th
 - `GET /staff/orders?status=PAID`
 - `PATCH /staff/orders/:id/status` body `{ "status": "PREPARING" }`
 - `GET /staff/ingredients` xem kho nguyên liệu
+- `POST /staff/ingredients/:id/restock` body `{ "amount": 2000 }` nhập thêm nguyên liệu
