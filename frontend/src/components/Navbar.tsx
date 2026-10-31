@@ -53,7 +53,6 @@ export default function Navbar() {
           <Link href="/" className="hidden hover:text-amber-700 sm:inline">
             Menu
           </Link>
-
           {isClient && user && (
             <Link href="/orders" aria-label="Lịch sử đơn" className="hover:text-amber-700">
               <span className="sm:hidden">Đơn</span>
@@ -68,6 +67,13 @@ export default function Navbar() {
             </Link>
           )}
 
+          {isClient && user?.role === "STAFF" && (
+            <Link href="/staff/ingredients" aria-label="Kho nguyên liệu" className="hover:text-amber-700">
+              <span className="sm:hidden">Kho</span>
+              <span className="hidden sm:inline">Kho nguyên liệu</span>
+            </Link>
+          )}
+          
           <Link
             href="/cart"
             aria-label="Giỏ hàng"
