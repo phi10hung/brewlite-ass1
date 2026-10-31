@@ -73,7 +73,7 @@ docker compose --profile app up --build -d
 - Lần đầu mất vài phút để tải và build. Khi xong mở **http://localhost:3000** (API ở http://localhost:4000).
 - Backend tự tạo bảng và tự nạp dữ liệu mẫu nếu database còn trống.
 - Xem log: `docker compose --profile app logs -f backend`
-- Tắt: `docker compose --profile app down` (thêm `-v` nếu muốn xoá luôn dữ liệu)
+- Tắt: `docker compose --profile app stop` (giữ container và dữ liệu, lần sau bật lại nhanh)
 - Nạp lại dữ liệu mẫu: `docker compose exec backend npx prisma db seed`
 - Sửa code xong muốn cập nhật: chạy lại `docker compose --profile app up --build -d`
 
