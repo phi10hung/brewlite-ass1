@@ -161,3 +161,106 @@ describe('StaffService.restockIngredient', () => {
     expect(update).not.toHaveBeenCalled();
   });
 });
+
+describe('StaffService.getRevenue', () => {
+  const findMany = jest.fn();
+  let service: StaffService;
+
+  const payment = (id: number, overrides: Record<string, unknown>) => ({
+    id,
+    status: 'SUCCESS',
+    amount: 100_000,
+    payDate: null,
+    refundStatus: null,
+    order: { status: OrderStatus.PAID },
+    ...overrides,
+  });
+  const report = async (...payments: unknown[]) => {
+    findMany.mockResolvedValue(payments);
+    return service.getRevenue();
+  };
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    const prisma = { payment: { findMany } } as unknown as PrismaService;
+    service = new StaffService(prisma, {} as OrdersService);
+  });
+
+  it('chỉ cộng giao dịch thành công của đơn không bị hủy', async () => {
+    const result = await report(
+      payment(1, { amount: 180_000 }),
+      payment(2, { amount: 70_000, order: { status: OrderStatus.COMPLETED } }),
+      payment(3, {
+        amount: 50_000,
+        refundStatus: 'FAILED',
+        order: { status: OrderStatus.CANCELLED },
+      }),
+      payment(4, { amount: 90_000, status: 'FAILED' }),
+    );
+
+    expect(result.totalRevenue).toBe(250_000);
+    expect(result.refundAmount).toBe(50_000);
+    expect(result.counts).toEqual({
+      SUCCESS: 2,
+      REFUND: 1,
+      PENDING: 0,
+      FAILED: 1,
+    });
+  });
+
+  it('đã trả tiền mà đơn bị hủy thì vào nhóm hoàn tiền, kể cả lúc chưa bắt đầu hoàn', async () => {
+    const result = await report(
+      payment(1, { order: { status: OrderStatus.CANCELLED } }),
+      payment(2, {
+        refundStatus: 'SUCCESS',
+        order: { status: OrderStatus.CANCELLED },
+      }),
+    );
+
+    expect(result.transactions.map((t) => t.group)).toEqual([
+      'REFUND',
+      'REFUND',
+    ]);
+    expect(result.totalRevenue).toBe(0);
+  });
+
+  it('đang chờ chỉ khi đơn còn chờ thanh toán, đơn đã đi tiếp thì tính thất bại', async () => {
+    const result = await report(
+      payment(1, { status: 'PENDING', order: { status: OrderStatus.PENDING } }),
+      payment(2, {
+        status: 'PENDING',
+        order: { status: OrderStatus.CANCELLED },
+      }),
+      payment(3, { status: 'PENDING', order: { status: OrderStatus.PAID } }),
+    );
+
+    expect(result.transactions.map((t) => t.group)).toEqual([
+      'PENDING',
+      'FAILED',
+      'FAILED',
+    ]);
+    expect(result.totalRevenue).toBe(0);
+  });
+
+  it('đổi vnp_PayDate sang giờ Việt Nam, sai định dạng thì để trống', async () => {
+    const result = await report(
+      payment(1, { payDate: '20261028000012' }),
+      payment(2, { payDate: 'abc' }),
+    );
+
+    expect(result.transactions[0].paidAt).toBe('2026-10-28T00:00:12+07:00');
+    expect(result.transactions[1].paidAt).toBeNull();
+    expect(result.transactions[0]).not.toHaveProperty('payDate');
+  });
+
+  it('chưa có giao dịch thì trả 0', async () => {
+    const result = await report();
+
+    expect(result).toEqual({
+      totalRevenue: 0,
+      refundAmount: 0,
+      counts: { SUCCESS: 0, REFUND: 0, PENDING: 0, FAILED: 0 },
+      transactions: [],
+    });
+  });
+});
