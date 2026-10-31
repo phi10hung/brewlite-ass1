@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { OrderStatus } from '../generated/prisma/enums';
+import { OrderStatus, PaymentStatus } from '../generated/prisma/enums';
 import { OrdersService } from '../orders/orders.service';
 import { assertTransition } from '../orders/order-status';
 import { PrismaService } from '../prisma/prisma.service';
@@ -28,6 +28,71 @@ const ORDER_INCLUDE = {
   user: { select: { id: true, name: true } },
   items: true,
 } as const;
+
+// Giao dịch trên trang Doanh thu chia 4 nhóm
+const REVENUE_GROUPS = ['SUCCESS', 'REFUND', 'PENDING', 'FAILED'] as const;
+type RevenueGroup = (typeof REVENUE_GROUPS)[number];
+
+const REVENUE_SELECT = {
+  id: true,
+  method: true,
+  status: true,
+  amount: true,
+  transactionNo: true,
+  payDate: true,
+  refundStatus: true,
+  refundedAt: true,
+  createdAt: true,
+  order: {
+    select: {
+      code: true,
+      status: true,
+      subtotal: true,
+      discount: true,
+      total: true,
+      promotionCode: true,
+      expiresAt: true,
+      createdAt: true,
+      user: { select: { name: true } },
+      items: {
+        orderBy: { id: 'asc' },
+        select: {
+          id: true,
+          productName: true,
+          size: true,
+          toppings: true,
+          quantity: true,
+          lineTotal: true,
+        },
+      },
+    },
+  },
+} as const;
+
+function revenueGroup(payment: {
+  status: PaymentStatus;
+  refundStatus: unknown;
+  order: { status: OrderStatus };
+}): RevenueGroup {
+  if (payment.status === PaymentStatus.SUCCESS) {
+    return payment.refundStatus || payment.order.status === OrderStatus.CANCELLED
+      ? 'REFUND'
+      : 'SUCCESS';
+  }
+  // Đơn đã hủy hoặc khách trả bằng link khác thì link này không còn chờ nữa
+  return payment.status === PaymentStatus.PENDING &&
+    payment.order.status === OrderStatus.PENDING
+    ? 'PENDING'
+    : 'FAILED';
+}
+
+// vnp_PayDate dạng yyyyMMddHHmmss theo giờ Việt Nam, đổi sang ISO cho frontend
+function payDateToIso(payDate: string | null): string | null {
+  const parts = payDate?.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/);
+  if (!parts) return null;
+  const [, year, month, day, hour, minute, second] = parts;
+  return `${year}-${month}-${day}T${hour}:${minute}:${second}+07:00`;
+}
 
 @Injectable()
 export class StaffService {
@@ -66,6 +131,33 @@ export class StaffService {
       data: { stock: { increment: amount }, version: { increment: 1 } },
       select: { id: true, name: true, unit: true, stock: true },
     });
+  }
+
+  // Doanh thu chỉ tính tiền VNPay đã xác nhận và đơn không bị hủy
+  async getRevenue() {
+    const payments = await this.prisma.payment.findMany({
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      select: REVENUE_SELECT,
+    });
+    const transactions = payments.map(({ payDate, ...payment }) => ({
+      ...payment,
+      group: revenueGroup(payment),
+      paidAt: payDateToIso(payDate),
+    }));
+
+    const inGroup = (group: RevenueGroup) =>
+      transactions.filter((t) => t.group === group);
+    const sum = (group: RevenueGroup) =>
+      inGroup(group).reduce((total, t) => total + t.amount, 0);
+
+    return {
+      totalRevenue: sum('SUCCESS'),
+      refundAmount: sum('REFUND'),
+      counts: Object.fromEntries(
+        REVENUE_GROUPS.map((group) => [group, inGroup(group).length]),
+      ),
+      transactions,
+    };
   }
 
   async updateStatus(id: number, status: OrderStatus) {
