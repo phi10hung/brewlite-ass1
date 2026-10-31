@@ -191,6 +191,18 @@ export class OrdersService {
       return 0;
     };
 
+    // Thiếu nguyên liệu nào thì báo lỗi đúng tên món, chưa trừ gì
+    const assertEnough = (stock: Map<number, number>) => {
+      for (const [ingredientId, amount] of entries) {
+        if ((stock.get(ingredientId) ?? 0) >= amount) continue;
+        const i = lineUsing(ingredientId);
+        const cups = maxCups(stock, needsOf(i, 1));
+        throw new BadRequestException(
+          `Món ${lines[i].productName} không đủ nguyên liệu, chỉ còn pha được ${cups} ly`,
+        );
+      }
+    };
+
     const expiresAt = new Date(Date.now() + paymentMinutes() * 60_000);
 
         // Mỗi khách chỉ giữ 1 đơn chờ thanh toán: đặt đơn mới thì hủy đơn chờ cũ, trả nguyên liệu
@@ -199,8 +211,24 @@ export class OrdersService {
         userId,
         status: { in: [OrderStatus.PENDING, OrderStatus.PAYMENT_FAILED] },
       },
-      select: { id: true },
+      select: {
+        id: true,
+        ingredients: { select: { ingredientId: true, amount: true } },
+      },
     });
+    // Kiểm tra trước khi hủy, tính cả phần đơn cũ đang giữ: thiếu thì đơn cũ vẫn còn
+    if (waiting.length > 0) {
+      const rows = await this.prisma.ingredient.findMany({
+        where: { id: { in: entries.map(([id]) => id) } },
+        select: { id: true, stock: true },
+      });
+      const available = new Map(rows.map((r) => [r.id, r.stock]));
+      for (const row of waiting.flatMap((o) => o.ingredients)) {
+        const stock = available.get(row.ingredientId);
+        if (stock !== undefined) available.set(row.ingredientId, stock + row.amount);
+      }
+      assertEnough(available);
+    }
     for (const old of waiting) {
       try {
         await this.cancel(old.id, 'SYSTEM');
@@ -231,14 +259,7 @@ export class OrdersService {
           }
 
           // 2. Thiếu nguyên liệu nào thì báo lỗi, chưa trừ gì
-          for (const [ingredientId, amount] of entries) {
-            if ((stock.get(ingredientId) ?? 0) >= amount) continue;
-            const i = lineUsing(ingredientId);
-            const cups = maxCups(stock, needsOf(i, 1));
-            throw new BadRequestException(
-              `Món ${lines[i].productName} không đủ nguyên liệu, chỉ còn pha được ${cups} ly`,
-            );
-          }
+          assertEnough(stock);
 
           // 3. Trừ kho chỉ khi version chưa đổi (optimistic locking)
           for (const [ingredientId, amount] of entries) {

@@ -185,7 +185,7 @@ model Payment {
   txnRef         String?       @unique // vnp_TxnRef gửi sang VNPay
   payUrl         String? // link trang thanh toán VNPay
   transactionNo  String? // vnp_TransactionNo VNPay trả về, cần khi hoàn tiền
-  payDate        String? // vnp_PayDate (yyyyMMddHHmmss), cần khi hoàn tiền
+  payDate        String? // vnp_PayDate (yyyyMMddHHmmss), giờ VNPay xác nhận thanh toán
   refundStatus   RefundStatus?
   refundedAt     DateTime?
   createdAt      DateTime      @default(now())
