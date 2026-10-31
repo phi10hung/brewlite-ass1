@@ -421,7 +421,7 @@ export default function CheckoutPage() {
             <div className="flex justify-between text-stone-500">
               <span>Giảm giá</span>
               <span>
-                -{formatPrice(discount)}
+                {discount > 0 ? `-${formatPrice(discount)}` : formatPrice(0)}
               </span>
             </div>
 
