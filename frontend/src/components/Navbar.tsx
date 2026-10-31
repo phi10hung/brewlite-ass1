@@ -62,9 +62,9 @@ export default function Navbar() {
           )}
 
           {isClient && user?.role === "STAFF" && (
-            <Link href="/staff" aria-label="Quản lý đơn" className="hover:text-amber-700">
-              <span className="sm:hidden">Quản lý</span>
-              <span className="hidden sm:inline">Quản lý đơn</span>
+            <Link href="/staff/ingredients" aria-label="Kho nguyên liệu" className="hover:text-amber-700">
+              <span className="sm:hidden">Kho</span>
+              <span className="hidden sm:inline">Kho nguyên liệu</span>
             </Link>
           )}
 
