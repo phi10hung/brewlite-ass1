@@ -84,6 +84,8 @@ function kindFromCallback(result: VnpayPaymentResult): ResultKind {
   if (result.responseCode === '00' && result.transactionStatus === '00') {
     return 'SUCCESS';
   }
+  // Không có mã kết quả (mở lại link thanh toán gốc): chưa biết gì, giữ nguyên đơn
+  if (!result.responseCode) return 'PENDING';
   if (result.responseCode !== '00') return 'FAILED';
   return 'PENDING';
 }
@@ -693,7 +695,8 @@ export class PaymentsService {
           txnRef: payment.txnRef ?? '',
           amount: payment.amount,
           transactionNo: payment.transactionNo ?? '',
-          transactionDate: payment.payDate ?? '',
+          // VNPay yêu cầu giống vnp_CreateDate của lệnh thanh toán, không phải vnp_PayDate
+          transactionDate: payment.createdAt,
           createBy: 'BrewLite',
         });
       } catch (error) {

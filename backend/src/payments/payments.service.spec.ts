@@ -632,7 +632,7 @@ describe('PaymentsService', () => {
       txnRef: 'BL7K2M9QX4P2AB',
       amount: 50000,
       transactionNo: 'VNP123',
-      transactionDate: '20261027230000',
+      transactionDate: createdAt,
       createBy: 'BrewLite',
     });
     expect(prismaMock.payment.update).toHaveBeenNthCalledWith(2, {
@@ -934,6 +934,22 @@ describe('PaymentsService', () => {
       payment(),
       expect.objectContaining({ responseCode: '24' }),
       'FAILED',
+    );
+  });
+
+  it('handleReturn: link không có mã kết quả, VNPay chưa ghi nhận → giữ nguyên đơn', async () => {
+    const apply = spyApply();
+    prismaMock.payment.findUnique.mockResolvedValue(payment({ status: 'PENDING' }));
+    vnpayMock.queryTransaction.mockResolvedValue(queryResult('99', ''));
+    const { vnp_ResponseCode: _code, vnp_TransactionStatus: _status, ...query } =
+      returnQuery('', '');
+
+    await service.handleReturn(query);
+
+    expect(apply).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ responseCode: '' }),
+      'PENDING',
     );
   });
 
