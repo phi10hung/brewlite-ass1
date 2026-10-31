@@ -121,6 +121,8 @@
 |  |  | Chỉnh sửa | Chạy thử API, duyệt và merge PR #68 vào develop | Hùng | PR #68 |
 | 4 | 27/10/2026 | Phân công | Tạo đơn lưu phương thức thanh toán, hạn thanh toán 5 phút, tự hủy đơn chờ thanh toán cũ của khách; bỏ giới hạn 20 ly | Quang | #77 |
 | 5 | 28/10/2026 | Bổ sung | Tạo đơn lưu phương thức thanh toán, hạn 5 phút; đặt đơn mới tự hủy đơn chờ thanh toán cũ (trả nguyên liệu); API đơn hàng trả thêm hạn thanh toán, phương thức, trạng thái hoàn tiền; khách tự hủy đơn qua PATCH /orders/:id/cancel | Quang | #77, PR #84 |
+| 6 | 31/10/2026 | Chỉnh sửa | Đơn mới thiếu nguyên liệu thì báo lỗi và giữ nguyên đơn chờ cũ của khách (trước đó đơn cũ bị hủy dù đơn mới không đặt được); unit test | Hùng | #103, PR #104 |
+|  |  | Chỉnh sửa | Review và merge PR #104 vào develop | Quang | PR #104 |
 
 ## Task 7 – Đăng ký / Đăng nhập (JWT)
 
@@ -167,6 +169,9 @@
 |  |  | Chỉnh sửa | Chạy thử PR #89 bằng kết quả VNPay có chữ ký thật lúc VNPay tra cứu đang lỗi: trả thành công → Đã thanh toán, gửi lại không cộng điểm 2 lần, sửa số tiền → báo lỗi 400, khách hủy → Thanh toán lỗi; duyệt và merge | Hùng | PR #89 |
 |  |  | Bổ sung | Trang kết quả thanh toán /payment/result (thành công: xoá giỏ, cập nhật điểm, tự sang trang đơn; không thành công: Thanh toán lại, Hủy đơn, Về giỏ hàng); tác vụ nền tự hủy đơn quá hạn 5 phút (trả nguyên liệu) và thử lại hoàn tiền bị lỗi; unit test, README VNPay, User Story | Hùng | #78, PR #92 |
 |  |  | Chỉnh sửa | Review và merge PR #92 vào develop | Quang | PR #92 |
+| 9 | 31/10/2026 | Chỉnh sửa | Đối chiếu tài liệu VNPay: hoàn tiền đang gửi ngày thanh toán thay vì ngày tạo giao dịch; gọi thử trực tiếp API tra cứu, hoàn tiền của VNPay Sandbox: cả 2 cách đều báo lỗi 99 | Hùng | #103 |
+|  |  | Chỉnh sửa | Hoàn tiền gửi vnp_TransactionDate giống vnp_CreateDate của lệnh thanh toán (VNPay Sandbox đang báo lỗi 99 nên chưa xác nhận được hoàn tiền thành công); mở lại link thanh toán gốc không có mã kết quả thì giữ nguyên đơn; Checkout không hiện -0đ khi không giảm giá; unit test | Hùng | #103, PR #104 |
+|  |  | Chỉnh sửa | Review và merge PR #104 vào develop | Quang | PR #104 |
 
 ## Task 9 – Xác nhận, lịch sử đơn và bàn giao
 
@@ -195,6 +200,9 @@
 |  |  | Chỉnh sửa | Bỏ dòng trống thừa ở lịch sử đơn, chi tiết đơn; thêm tiêu đề, mô tả PR | Khoa | PR #90 |
 |  |  | Chỉnh sửa | Duyệt và merge PR #90 vào develop | Hùng | PR #90 |
 | 9 | 30/10/2026 | Chỉnh sửa | Chạy thử toàn bộ 24 mục trên develop (build, Docker trên database trống, kiểm thử API, bấm giao diện trên Chrome, trả bằng thẻ test VNPay Sandbox, màn hình điện thoại 390px): 24/24 mục đạt, phát hiện 4 lỗi nhỏ; tạo issue | Hùng | #17, #94 |
+| 10 | 31/10/2026 | Chỉnh sửa | Chạy thử toàn bộ 36 mục (build, Docker, kiểm thử API, bấm giao diện trên Chrome, trả bằng thẻ test VNPay Sandbox, trang Kho nguyên liệu, trang Doanh thu, màn hình 360–1024px): 36/36 mục đạt, phát hiện 5 lỗi nhỏ; tạo issue | Hùng | #17, #103 |
+|  |  | Chỉnh sửa | README hướng dẫn tắt Docker bằng stop (giữ container và dữ liệu) | Hùng | #103, PR #104 |
+|  |  | Chỉnh sửa | Review và merge PR #104 vào develop | Quang | PR #104 |
 
 ## Task 10 – Nghiệp vụ backend nâng cao
 
@@ -245,6 +253,14 @@
 |  |  | Chỉnh sửa | Chạy thử PR #86: nhân viên xem được kho (khách bị chặn 403), bấm "Nhận đơn" 2 lần cùng lúc chỉ chạy 1 lần, hủy đơn đã thanh toán 2 lần cùng lúc chỉ trả nguyên liệu 1 lần; duyệt và merge | Hùng | PR #86 |
 | 10 | 30/10/2026 | Chỉnh sửa | Nhân viên hủy đơn đã nhận pha: báo rõ "Đơn đã nhận pha, không hủy được nữa", cập nhật test | Hùng | #94, PR #95 |
 |  |  | Chỉnh sửa | Review và merge PR #95 vào develop | Quang | PR #95 |
+| 11 | 31/10/2026 | Bổ sung | Làm thêm: API POST /staff/ingredients/:id/restock cho nhân viên nhập thêm nguyên liệu (chỉ cộng thêm, số nguyên dương, đơn đang đặt không bị lệch kho); unit test, User Story | Hùng | #97, PR #99 |
+|  |  | Chỉnh sửa | Review PR #99 (Quang, Búp), merge vào develop (Búp) | Quang, Búp | PR #99 |
+|  |  | Chỉnh sửa | Tách Kho nguyên liệu thành trang /staff/ingredients, thêm mục Kho nguyên liệu trên Navbar của nhân viên; bảng kho có ô nhập số và nút Nhập kho, nhập sai báo lỗi tại dòng; User Story | Búp | #98, PR #100 |
+|  |  | Chỉnh sửa | Chạy thử PR #100: mục Quản lý đơn trên Navbar của nhân viên bị mất; gửi hướng dẫn sửa | Hùng | PR #100 |
+|  |  | Chỉnh sửa | Trả lại mục Quản lý đơn trên Navbar của nhân viên | Búp | PR #100 |
+|  |  | Chỉnh sửa | Chạy thử lại, duyệt và merge PR #100 vào develop | Hùng | PR #100 |
+|  |  | Bổ sung | Làm thêm: trang Doanh thu cho nhân viên: API GET /staff/revenue (doanh thu chỉ tính giao dịch thành công của đơn không bị hủy), ô tổng tiền, 4 ô đếm Thành công, Hoàn tiền, Đang chờ, Thất bại, nút lọc, bấm giao dịch xổ chi tiết đơn; thêm mục Doanh thu, Navbar nhân viên gọn 1 dòng từ màn hình 360px; unit test, User Story | Hùng | #101, PR #102 |
+|  |  | Chỉnh sửa | Review và merge PR #102 vào develop | Quang | PR #102 |
 
 ## Tài liệu – User Story và bảng tiến độ
 
@@ -270,3 +286,5 @@
 |  |  | Bổ sung | Ghi bảng tiến độ ngày 29/10 | Hùng | #22 |
 | 9 | 30/10/2026 | Chỉnh sửa | Review và merge PR #93 (tiến độ 29/10) | Quang | PR #93 |
 |  |  | Bổ sung | Ghi bảng tiến độ ngày 30/10 | Hùng | #22 |
+| 10 | 31/10/2026 | Chỉnh sửa | Review PR #96 (tiến độ 30/10) (Quang, Búp), merge vào develop (Búp) | Quang, Búp | PR #96 |
+| 11 | 01/11/2026 | Bổ sung | Ghi bảng tiến độ ngày 31/10 (ghi bù) | Hùng | #22 |
