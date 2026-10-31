@@ -45,6 +45,11 @@ function setup(initialStock: Record<number, number> = DEFAULT_STOCK) {
     recipe: { findMany: jest.fn().mockResolvedValue(RECIPES) },
     toppingRecipe: { findMany: jest.fn().mockResolvedValue(TOPPING_RECIPES) },
     ingredient: {
+      findMany: jest.fn(async ({ where }) =>
+        where.id.in
+          .filter((id: number) => ingredients.has(id))
+          .map((id: number) => ({ id, stock: ingredients.get(id)?.stock })),
+      ),
       findUnique: jest.fn(async ({ where }) => {
         await Promise.resolve(); // nhường lượt để các đơn đồng thời cùng đọc trước khi ai ghi
         const ing = ingredients.get(where.id);
@@ -418,7 +423,10 @@ describe('OrdersService - thử lại khi xung đột version', () => {
 describe('OrdersService - đặt đơn mới hủy đơn chờ cũ', () => {
   it('hủy các đơn chờ thanh toán cũ của khách trước khi tạo đơn mới', async () => {
     const { service, fake } = setup();
-    fake.order.findMany.mockResolvedValue([{ id: 11 }, { id: 12 }]);
+    fake.order.findMany.mockResolvedValue([
+      { id: 11, ingredients: [] },
+      { id: 12, ingredients: [] },
+    ]);
     const cancel = jest.spyOn(service, 'cancel').mockResolvedValue(null);
 
     await service.create(7, makeDto(latteM()));
@@ -435,7 +443,7 @@ describe('OrdersService - đặt đơn mới hủy đơn chờ cũ', () => {
 
   it('đơn cũ vừa thanh toán xong (409) thì giữ nguyên, vẫn tạo đơn mới', async () => {
     const { service, fake } = setup();
-    fake.order.findMany.mockResolvedValue([{ id: 11 }]);
+    fake.order.findMany.mockResolvedValue([{ id: 11, ingredients: [] }]);
     jest.spyOn(service, 'cancel').mockRejectedValue(new ConflictException());
 
     await service.create(7, makeDto(latteM()));
@@ -445,7 +453,7 @@ describe('OrdersService - đặt đơn mới hủy đơn chờ cũ', () => {
 
   it('đơn mới không hợp lệ thì không đụng đơn cũ', async () => {
     const { service, fake } = setup();
-    fake.order.findMany.mockResolvedValue([{ id: 11 }]);
+    fake.order.findMany.mockResolvedValue([{ id: 11, ingredients: [] }]);
     const cancel = jest.spyOn(service, 'cancel').mockResolvedValue(null);
     fake.product.findMany.mockResolvedValue([]); // món không tồn tại
 
@@ -454,6 +462,47 @@ describe('OrdersService - đặt đơn mới hủy đơn chờ cũ', () => {
     );
 
     expect(cancel).not.toHaveBeenCalled();
+  });
+
+  it('đơn mới thiếu nguyên liệu thì giữ nguyên đơn cũ, không tạo đơn', async () => {
+    // Kho còn 18g cà phê, đơn cũ giữ 18g: cộng lại chỉ đủ 2 ly, đơn mới cần 3 ly
+    const { service, fake } = setup({ [CA_PHE]: 18, [SUA]: 5000 });
+    fake.order.findMany.mockResolvedValue([
+      { id: 11, ingredients: [{ ingredientId: CA_PHE, amount: 18 }] },
+    ]);
+    const cancel = jest.spyOn(service, 'cancel').mockResolvedValue(null);
+
+    await expect(service.create(7, makeDto(latteM(3)))).rejects.toThrow(
+      'Món Latte không đủ nguyên liệu, chỉ còn pha được 2 ly',
+    );
+
+    expect(cancel).not.toHaveBeenCalled();
+    expect(fake.order.create).not.toHaveBeenCalled();
+  });
+
+  it('kho đang hết nhưng đơn cũ giữ đủ nguyên liệu thì vẫn đổi được sang đơn mới', async () => {
+    const { service, fake, ingredients } = setup({ [CA_PHE]: 0, [SUA]: 0 });
+    fake.order.findMany.mockResolvedValue([
+      {
+        id: 11,
+        ingredients: [
+          { ingredientId: CA_PHE, amount: 18 },
+          { ingredientId: SUA, amount: 200 },
+        ],
+      },
+    ]);
+    // Hủy đơn cũ thì nguyên liệu quay lại kho
+    const cancel = jest.spyOn(service, 'cancel').mockImplementation(async () => {
+      ingredients.get(CA_PHE)!.stock += 18;
+      ingredients.get(SUA)!.stock += 200;
+      return null;
+    });
+
+    await service.create(7, makeDto(latteM()));
+
+    expect(cancel).toHaveBeenCalledWith(11, 'SYSTEM');
+    expect(fake.order.create).toHaveBeenCalledTimes(1);
+    expect(ingredients.get(CA_PHE)?.stock).toBe(0);
   });
 });
 
