@@ -52,6 +52,22 @@ export class StaffService {
     });
   }
   
+  // Nhập kho: chỉ cộng thêm. Tăng version để các đơn đang đặt dở đọc lại tồn kho mới
+  async restockIngredient(id: number, amount: number) {
+    const ingredient = await this.prisma.ingredient.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    if (!ingredient) {
+      throw new NotFoundException('Không tìm thấy nguyên liệu');
+    }
+    return this.prisma.ingredient.update({
+      where: { id },
+      data: { stock: { increment: amount }, version: { increment: 1 } },
+      select: { id: true, name: true, unit: true, stock: true },
+    });
+  }
+
   async updateStatus(id: number, status: OrderStatus) {
     const order = await this.prisma.order.findUnique({ where: { id } });
     if (!order) {
