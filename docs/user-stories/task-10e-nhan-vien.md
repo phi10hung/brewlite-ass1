@@ -18,8 +18,10 @@ Là **nhân viên quán**, tôi muốn xem danh sách đơn, chuyển trạng th
   "Bạn không có quyền xem trang này".
 - Trang có trạng thái đang tải, chưa có đơn và lỗi (có nút Thử lại).
 - API nhập kho: chỉ nhân viên gọi được, chỉ cộng thêm, số lượng là số nguyên dương (sai trả 400), nguyên liệu không tồn tại trả 404; nhập xong số ly còn pha tăng theo.
-- Trang `/staff` có bảng "Kho nguyên liệu" gồm 3 cột: Tên, Tồn kho, Đơn vị. Nguyên liệu hết (tồn kho bằng 0) được tô đỏ.
-- Bảng kho có nút "Tải lại" để cập nhật số liệu, và có trạng thái đang tải, chưa có nguyên liệu, lỗi. Bảng chỉ để xem, không sửa tồn kho tại đây.
+- Navbar của nhân viên có mục "Kho nguyên liệu" (điện thoại ghi "Kho"), mở trang `/staff/ingredients`; trang `/staff` chỉ còn quản lý đơn. Khách vào trang kho thấy "Bạn không có quyền xem trang này".
+- Bảng kho có các cột: Tên, Tồn kho, Đơn vị, Nhập kho. Nguyên liệu hết (tồn kho bằng 0) được tô đỏ.
+- Mỗi dòng có ô nhập số và nút "Nhập kho": nhập xong số tồn cập nhật ngay và hiện "Đã nhập 2.000 ml"; nhập sai thì báo lỗi ngay tại dòng đó, kho không đổi.
+- Bảng kho có nút "Tải lại" để cập nhật số liệu, và có trạng thái đang tải, chưa có nguyên liệu, lỗi.
 
 ## API
 - `GET /staff/orders?status=PAID`
