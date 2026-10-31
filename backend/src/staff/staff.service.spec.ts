@@ -123,3 +123,41 @@ describe('StaffService.listIngredients', () => {
     expect(result).toEqual(rows);
   });
 });
+
+describe('StaffService.restockIngredient', () => {
+  const findUnique = jest.fn();
+  const update = jest.fn();
+  let service: StaffService;
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    const prisma = {
+      ingredient: { findUnique, update },
+    } as unknown as PrismaService;
+    service = new StaffService(prisma, {} as unknown as OrdersService);
+  });
+
+  it('cộng thêm vào kho và tăng version', async () => {
+    const row = { id: 3, name: 'Sữa tươi', unit: 'ml', stock: 9400 };
+    findUnique.mockResolvedValue({ id: 3 });
+    update.mockResolvedValue(row);
+
+    const result = await service.restockIngredient(3, 2000);
+
+    expect(update).toHaveBeenCalledWith({
+      where: { id: 3 },
+      data: { stock: { increment: 2000 }, version: { increment: 1 } },
+      select: { id: true, name: true, unit: true, stock: true },
+    });
+    expect(result).toEqual(row);
+  });
+
+  it('không tìm thấy nguyên liệu thì báo 404, không cộng kho', async () => {
+    findUnique.mockResolvedValue(null);
+
+    await expect(service.restockIngredient(999, 100)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(update).not.toHaveBeenCalled();
+  });
+});
