@@ -11,8 +11,8 @@
 - [x] README hướng dẫn cài đặt, chạy database và tài khoản test; có .env.example, .gitignore
 - [x] docker-compose chạy PostgreSQL
 - [x] Prisma schema đủ các bảng: Product, Topping, User, Order, OrderItem, Payment, Promotion, LoyaltyTransaction
-- [x] Tính trước cho Task 10: Product.version, Payment.idempotencyKey (không trùng), User.loyaltyPoints
-- [x] Chạy npx prisma db seed tạo được dữ liệu mẫu: 14 đồ uống có ảnh, giá, tồn kho; 9 topping; 2 mã giảm giá; 2 tài khoản
+- [x] Tính trước cho Task 10: Payment.idempotencyKey (không trùng), User.loyaltyPoints; optimistic locking dùng `version` của bảng Ingredient
+- [x] Chạy npx prisma db seed tạo được dữ liệu mẫu: 14 đồ uống có ảnh, giá; 9 topping; 2 mã giảm giá; 2 tài khoản
 - [x] Có endpoint /health để kiểm tra backend và database đang chạy
 - [x] Kho nguyên liệu theo công thức pha chế: bảng Ingredient (tồn kho, version), Recipe (công thức món, size M), ToppingRecipe (công thức topping), OrderIngredient (lượng nguyên liệu đã trừ của từng đơn)
 - [x] Thanh toán VNPay: Order có paymentMethod, expiresAt (hạn thanh toán); Payment có trạng thái PENDING, mã giao dịch VNPay, trạng thái hoàn tiền
