@@ -1,6 +1,6 @@
 # User Story – Task 10a: Order State Machine
 
-**Người viết:** Đỗ Xuân Triệu · **Issue:** #18 · **Sprint:** 1
+**Người viết:** Đỗ Xuân Triệu · **Issue:** #18 · **Sprint:** 3
 
 Là **chủ quán**, tôi muốn đơn hàng chỉ được chuyển trạng thái chính xác theo quy trình, để không có đơn nào bị nhảy sai bước (ví dụ chưa thanh toán đã pha chế, hay đã pha chế rồi lại bị huỷ)
 

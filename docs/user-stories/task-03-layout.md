@@ -12,4 +12,4 @@
 - [x] Bấm logo hoặc "Menu" quay về trang Menu, bấm icon giỏ hàng sang trang giỏ hàng
 - [x] Navbar luôn nằm trên cùng khi cuộn trang
 - [x] Hiển thị gọn gàng trên điện thoại và máy tính
-- [x] Trên điện thoại (390px) Navbar nằm gọn 1 dòng: ẩn "Menu" (bấm logo về Menu), chữ ngắn "Đơn", "Quản lý", "Thoát" 
+- [x] Trên điện thoại (390px) Navbar nằm gọn 1 dòng: ẩn "Menu" (bấm logo về Menu), chữ ngắn "Đơn", "Kho", "Thoát" 
