@@ -1,6 +1,6 @@
 # User Story – Task 5: Giỏ hàng
 
-**Người viết:** Linh · **Issue:** #8, #79 · **Sprint:** 1, 3.
+**Người viết:** Linh · **Issue:** #8, #79 · **Sprint:** 2, 3.
 
 **Là** khách hàng,
 **tôi muốn** cho đồ uống đã chọn vào giỏ, sửa số lượng hoặc xoá món, và xem tổng tiền,
@@ -13,8 +13,8 @@
 - [x] Tự tính tổng tiền
 - [x] Tải lại trang giỏ hàng vẫn còn
 - [x] Giỏ trống thì hiện thông báo và nút quay lại menu
-- [ ] Bấm "Thêm vào giỏ" ở trang chi tiết (chờ nối với trang của Búp)
-- [ ] Badge số lượng trên Navbar (chờ layout của Khoa)
+- [x] Bấm "Thêm vào giỏ" ở trang chi tiết
+- [x] Badge số lượng trên Navbar
 - [x] Nút "+" giới hạn theo số ly còn pha được từ kho nguyên liệu (có tính nguyên liệu các món khác trong giỏ), hiện "Chỉ còn pha được X ly"
 - [x] Các món trong giỏ dùng chung nguyên liệu (kể cả topping) mà cộng lại vượt kho thì tô đỏ dòng vượt, hiện cảnh báo ở đầu cột tổng tiền, chưa cho Tiến hành thanh toán
 - [x] Bấm Đăng xuất thì giỏ hàng được xoá, người đăng nhập sau không thấy giỏ cũ; hết hạn đăng nhập thì giỏ vẫn giữ để khách đăng nhập lại mua tiếp

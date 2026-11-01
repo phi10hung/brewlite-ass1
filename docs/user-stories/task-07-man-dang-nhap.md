@@ -14,4 +14,4 @@
 - [x] Mọi lần gọi API đều tự gửi kèm token đăng nhập
 - [x] Token hết hạn thì tự đăng xuất và chuyển sang trang đăng nhập, đăng nhập xong quay lại đúng trang đang xem
 - [x] Navbar: chưa đăng nhập hiện nút "Đăng nhập"; đã đăng nhập hiện tên và nút "Đăng xuất"
-- [ ] Chưa đăng nhập mà bấm thanh toán thì chuyển sang trang đăng nhập (làm khi nối trang Checkout)
+- [x] Chưa đăng nhập mà bấm thanh toán thì chuyển sang trang đăng nhập
