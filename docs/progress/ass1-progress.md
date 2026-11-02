@@ -206,6 +206,9 @@
 | 11 | 01/11/2026 | Chỉnh sửa | Chạy thử lại toàn bộ 41 mục trên develop sau khi sửa lỗi (lint, 208 unit test, build, Docker trên database trống, 85 kiểm tra API, bấm giao diện trên Chrome, trả bằng thẻ test VNPay Sandbox, trang Doanh thu, màn hình nhỏ): 41/41 mục đạt; hoàn tiền trên VNPay Sandbox vẫn báo lỗi 99 nên đơn dừng ở Đang hoàn tiền | Hùng | #17 |
 |  |  | Chỉnh sửa | Đối chiếu yêu cầu đề A1: đủ 10 task và test (a), (b), (c); đo 13 API đều dưới 500ms với dữ liệu mẫu; chạy luồng chính trên Edge, Firefox, WebKit đều đạt | Hùng | #17 |
 |  |  | Bổ sung | User Story Docker và bàn giao | Hùng | #17 |
+| 12 | 02/11/2026 | Chỉnh sửa | Viết lại README: chạy bằng Docker và npm, chức năng, trạng thái đơn, bảng API, kiểm thử, cấu trúc thư mục, thành viên; chạy thử các lệnh trên bản clone mới (Docker, npm, 208 unit test) đều đạt | Hùng | #107, PR #108 |
+|  |  | Chỉnh sửa | Review và merge PR #108 vào develop | Quang | PR #108 |
+|  |  | Meet | Cả nhóm chạy thử toàn bộ dự án | Cả nhóm | #17 |
 
 ## Task 10 – Nghiệp vụ backend nâng cao
 
@@ -294,3 +297,5 @@
 |  |  | Chỉnh sửa | Review và merge PR #105 (tiến độ 31/10) | Quang | PR #105 |
 |  |  | Bổ sung | Tổng hợp User Story Sprint 1, 2, 3 (22 story, kèm tiêu chí chính, người viết, issue); cập nhật User Story Task 1 theo kho nguyên liệu; rà lại User Story Task 3, 5, 7, 10a (tích tiêu chí đã xong, sửa số Sprint, chữ trên Navbar) | Hùng | #7, #12, #22 |
 |  |  | Bổ sung | Ghi bảng tiến độ ngày 01/11 | Hùng | #22 |
+| 12 | 02/11/2026 | Bổ sung | Làm báo cáo PDF: bảng phân công, 13 User Story, cấu trúc thư mục | Hùng | #22 |
+|  |  | Bổ sung | Ghi bảng tiến độ ngày 02/11; ghi bù PR #106 (tiến độ 01/11) do Quang review và merge ngày 01/11 | Hùng | #22 |
