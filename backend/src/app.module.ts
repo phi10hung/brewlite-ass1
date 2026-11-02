@@ -1,10 +1,30 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AuthModule } from './auth/auth.module';
+import { HealthController } from './health.controller';
+import { PrismaModule } from './prisma/prisma.module';
+import { ProductsModule } from './products/products.module';
+import { OrdersModule } from './orders/orders.module';
+import { PaymentsModule } from './payments/payments.module';
+import { PromotionsModule } from './promotions/promotions.module';
+import { StaffModule } from './staff/staff.module';
 
 @Module({
-  imports: [],
-  controllers: [AppController],
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }), // đọc file .env
+    ScheduleModule.forRoot(), // tác vụ nền: tự hủy đơn quá hạn, thử lại hoàn tiền
+    PrismaModule,
+    ProductsModule,
+    AuthModule,
+    OrdersModule,
+    PaymentsModule,
+    PromotionsModule,
+    StaffModule,
+  ],
+  controllers: [AppController, HealthController],
   providers: [AppService],
 })
 export class AppModule {}
